@@ -1,6 +1,6 @@
 ---
 title: "Kodutoo_1"
-author: "Siim"
+author: "Siim Põldre"
 date: "2/16/2021"
 output: html_document
 ---
@@ -33,7 +33,7 @@ ee9 <- read_csv("dats.csv")
 andmed2 <- ee9[,c(colnames(ee9[, 19:25]), "gndr", "agea", "eduyrs", "rlgdgr", "brncntr")]
 ```
 
-Teistest eristuvad spetsiifiliselt rahvusvahelisi organisatsioone nimetavatel küsimused, millel on kõige rohkem puuduvaid vastuseid. Kokku on 379 NA-d. 
+Teistest eristuvad spetsiifiliselt rahvusvahelisi organisatsioone nimetavad küsimused, millel on kõige rohkem puuduvaid vastuseid. Kokku on 379 NA-d. 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 Puuduvad <- andmed2 %>% 
   summarise_all(funs(sum(is.na(.)))) %>% 
@@ -47,9 +47,12 @@ tabel1 <- cbind(Puuduvad, Olemas$Olemas_arv)
 
 colnames(tabel1) <- c("Tunnus", "Puuduvate arv", "Valiidsete arv")
 
-tabel1 %>% 
-  kbl() %>% 
+tabel1 %>%
+  bind_rows(tibble(Tunnus = "Summa", `Puuduvate arv` = sum(tabel1$`Puuduvate arv`), `Valiidsete arv` = sum(tabel1$`Valiidsete arv`))) %>% 
+  kbl(caption = "Puuduvad väärtused tunnuste lõikes") %>% 
   kable_classic()
+
+
 ```
 
 10.4% inimestest on vähemalt ühes tunnuses andmelünk, st, et 89.6% on täielike andmetega.
@@ -61,9 +64,10 @@ andmed2$valiidne[!complete.cases(andmed2[1:7])] <- 0
 
 # arvutame täisvastustega indiviidide osakaalu
 as.data.frame(freq(andmed2$valiidne, plot = FALSE)) %>% 
-  rownames_to_column(var = "Value") %>% 
-  mutate(Value = recode(Value, `0`="Not complete", `1` = "Complete")) %>% 
-  kbl() %>% 
+  rownames_to_column(var = "Value") %>%
+  rename(Täisväärtuslikkus = "Value", Sagedus = "Frequency", Protsent = "Percent") %>% 
+  mutate(Täisväärtuslikkus = recode(Täisväärtuslikkus, `0`="Täisvastused", `1` = "Pole täisvastused")) %>% 
+  kbl(caption = "Täisvastuste osakaal") %>% 
   kable_classic()
 ```
 
@@ -71,17 +75,19 @@ Näha on, et meeste seas on täisvastustega indiviidide osakaal mõneti suurem. 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 andmed2 %>%
   group_by(gndr) %>%
-  summarise(valiid_osakaal = mean(valiidne)) %>% 
-    kbl() %>% 
+  summarise(`Valiidete osakaal` = mean(valiidne)) %>%
+  rename(Sugu = "gndr") %>% 
+    kbl(caption = "Soo ja puuduvate väärtuste suhe") %>% 
   kable_classic()
 ```
 
-Näha on, et täisvastustega indiviidide keskmine vanus on 49.64 aastat ja mitte-täisvastustega inimeste keskminevanus on 60.1 aastat. See viitab sellele, et vastamata jätavad keskmiselt vanemad inimesed ja taas täieliku juhuslikkuse puudumisele.
+Näha on, et täisvastustega indiviidide keskmine vanus on 49.66 aastat ja mitte-täisvastustega inimeste keskminevanus on 60.2 aastat. See viitab sellele, et vastamata jätavad keskmiselt vanemad inimesed ja taas täieliku juhuslikkuse puudumisele.
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 andmed2 %>%
   group_by(valiidne) %>%
-  summarise(keskm_vanus = mean(agea)) %>% 
-    kbl() %>% 
+  summarise(`Keskmine vanus` = mean(agea)) %>%
+  rename(Valiidsus = "valiidne") %>% 
+    kbl(caption = "Vanuse ja puuduvate väärtuste suhe") %>% 
   kable_classic()
 ```
 
@@ -100,12 +106,14 @@ andmed2 %>%
   group_by(vanusegrupp) %>%
   summarise(valiid_osakaal = mean(valiidne)) %>% 
   ggplot(aes(x=vanusegrupp, y = valiid_osakaal, color = vanusegrupp)) +
+  ggtitle("Vanuse ja puuduvate väärtuste suhe")+
   geom_point() +
   ylim(0, 1) +
   scale_colour_manual(values=c(hue_pal(h = c(90, 180))(7))) +
   xlab("Vanusegrupp") +
   ylab("Täisvastuste osakaal") +
-  theme(legend.position = "none")
+  theme(legend.position = "none")+
+  ggsave("vanus_vaartus.png", dpi = 300)
 ```
 
 Siin on pandud objektid vanuse järjekorda ja on ka näha, et vanuse kasvades kasvab inimeste arv, kellel on puuduvaid väärtuseid
@@ -115,12 +123,13 @@ andmed2%>%
   missing_plot()
 ```
 
-Vaadates religioossust tundub, et selget lineaarset mustrit pole religioossuse tõusu ja valiidsete vastuste osakaalu vahel. Samas on näha, et väga religiossete inimeste puhul on täielike vastuste määr kõige väiksem. Kõige suuremon täielike vastuste määr inimeste hulgas, kes hindavad oma religioossust tasemele 4. Üldiselt tundub, et mõlemas religioossuse äärmuses langeb täielike vastuste määr. Samuti on näha, et nende seas, kes pole religioossusele vastanud, on täielike vastuste osakaal 0%. 
+Vaadates religioossust tundub, et selget lineaarset mustrit pole religioossuse tõusu ja valiidsete vastuste osakaalu vahel. Samas on näha, et väga religiossete inimeste puhul on täielike vastuste määr kõige väiksem. Kõige suuremon täielike vastuste määr inimeste hulgas, kes hindavad oma religioossust tasemele 3. Nende seas, kes pole religioossusele vastanud, on täielike vastuste osakaal 50%. 
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 andmed2 %>%
   group_by(rlgdgr) %>%
-  summarise(valiid_osakaal = mean(valiidne)) %>% 
-  kbl() %>% 
+  summarise(`Valiidsete osakaal` = mean(valiidne)) %>%
+  rename(Religioossus = "rlgdgr") %>% 
+  kbl(caption = "Religioossuse ja puuduvate väärtuste suhe") %>% 
   kable_classic()
 ```
 
@@ -131,6 +140,7 @@ andmed2 %>%
   group_by(rlgdgr) %>% 
   summarise(valiid_osakaal = mean(valiidne)) %>% 
   ggplot(aes(x=rlgdgr, y = valiid_osakaal, color = rlgdgr)) +
+  ggtitle("Religioossus ja puuduvad vastused")+
   geom_point() +
   ylim(0, 1) +
   scale_colour_manual(values=c(hue_pal(h = c(90, 180))(11)), na.value = "#00C1A9") +
@@ -140,56 +150,57 @@ andmed2 %>%
   theme(legend.position = "none")
 ```
 
-Kui me jätame välja 6 inimest, kellel on religioossuse tulp NA, siis kodeerides religioossuse taseme numbriliseks (Not at all religious = 0 ja Very religious = 10), siis näeme, et nende inimeste seas, kellel pole ühtegi puudulikku väärtust on keskmine religioossus 3.3 ja nende seas kellel on puudulikke väärtusi 3.2.
+Kui me jätame välja 6 inimest, kellel on religioossuse tulp NA, siis kodeerides religioossuse taseme numbriliseks (Not at all religious = 0 ja Very religious = 10), siis näeme, et nende inimeste seas, kellel pole ühtegi puudulikku väärtust, on keskmine religioossus 3.3 ja nende seas kellel on puudulikke väärtusi, 3.2.
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 andmed2 %>% 
   filter(!is.na(rlgdgr)) %>% 
   mutate(rlgdgr2 = recode(rlgdgr, `Not at all religious` = 0, `Very religious` = 10, `1` = 1,
                           `2` = 2, `3` = 3, `4` = 4, `5` = 5, `6` = 6, `7` = 7, `8` = 8, `9` = 9)) %>% 
   group_by(valiidne) %>% 
-  summarise(keskm_religioossus = mean(rlgdgr2)) %>% 
-  kbl() %>% 
+  summarise(`Keskmine religioossus` = mean(rlgdgr2)) %>% 
+  rename(Valiidsus = "valiidne") %>% 
+  kbl(caption = "Puuduvate väärtuste ja religioossuse suhe 2") %>% 
   kable_classic
 ```
 
-Vaadates Eestis sündimist, on näha, et nende seas, kes pole sündinud Eestis, on täielike vastuste osakaal madalam (83.6%), kui nende seas, kes on sündinud Eestis (90.6%).
+Vaadates Eestis sündimist, on näha, et nende seas, kes pole sündinud Eestis, on täielike vastuste osakaal madalam (83.6%), kui nende seas, kes on sündinud Eestis (90.7%).
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 andmed2 %>%
   group_by(brncntr) %>%
-  summarise(valiid_osakaal = mean(valiidne)) %>% 
-  kbl() %>% 
+  summarise(`Valiidsete osakaal` = mean(valiidne)) %>%
+  rename(`Kas sündinud Eestis` = "brncntr") %>% 
+  kbl(caption = "Sünnikoha ja puuduvate väärtuste suhe") %>% 
   kable_classic
 ```
 
-Haridusaastaid vaadates on näha, et vähemate aastate puhul on rohkem inimesi, kellel on puuduvaid väärtuseid.
+Haridusaastaid vaadates on näha, et vähemate aastate puhul on pisut rohkem inimesi, kellel on puuduvaid väärtuseid.
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 andmed2%>% 
   arrange(eduyrs) %>% 
   missing_plot()
 ```
 
-missing_pattern funktsioon näitab meile kui palju erinevad puudu olemise mustrid esinevad.Näha on, et kõige rohkematel juhtudel pole puudu ühegi küsimuse vastust. Järgmisena on kõige tihemini puudu üks vastus, so ÜRO usaldamise küsimusele. Selle küsimuse vastus on ka puudu kõige rohkematel kordadel (153 inimesel). Samuti on tihti puudu vastus küsimusele euroopa liidu usaldamise kohta (131 juhtumit). Mõlemad küsimused esinevad 18-nes erinevas puuduvate küsimuste mustris. Süstemaatilisusele viitab nende kahe kõige vastuse puudumine koos. Nad puuduvad sagedamini koos, kui nad üksteisest eraldi puuduvad, ja tunduvalt sagedasemalt kui nad ülejäänud väärtustega koos puuduvad (kokku). **Seega on selge, et väga tihti, kui puudub üks, siis puudub ka teine.** See võib olla selgitatav sellega, et mõlemad küsimused puudutavad rahvusvaheliseid organisatsioone. Nende küsimuste välja jätmisega paraneks täielike vastustega indiviidide osakaal märkimisväärselt, kuid kaoks ära rahvusvaheliste organisatsioonide usalduse uurimise võimalus. 
+missing_pattern funktsioon näitab meile, kui palju erinevad puudu olemise mustreid on ja millised nad on. Näha on, et kõige rohkematel juhtudel pole puudu ühegi küsimuse vastust. Järgmisena on kõige tihemini puudu kaks vastust korraga: ÜRO ja Euroopa Liidu usaldamise küsimused. Süstemaatilisusele viitab nende kahe vastuse sagedane koos puudumine. Nad puuduvad sagedamini koos kui nad üksteisest eraldi puuduvad [eraldi: ÜRO 41 ja EU 19]. Isegi kokku teiste küsimustega puuduvate mustrite sageduste summa on väiksem. **Seega on selge, et väga tihti, kui puudub üks, siis puudub ka teine.** See võib olla selgitatav sellega, et mõlemad küsimused puudutavad rahvusvaheliseid organisatsioone. Nende küsimuste välja jätmisega paraneks täielike vastustega indiviidide osakaal märkimisväärselt, kuid kaoks ära rahvusvaheliste organisatsioonide usalduse uurimise võimalus. 
 ```{r echo = FALSE, message = FALSE, warning = FALSE, results = 'hide', fig.keep = 'all'}
 explanatory = colnames(andmed2)[1:7]
 andmed2 %>% 
   missing_pattern(explanatory)
 ```
 
-Näha on, et selles tulbas on 1061 puuduvat väärtust. Miinimum on 0 ja maksimum on 5000. Mediaan on 1050 ja keskmine on 1203. Mediaani ja keskmise erinemine viitab normaaljaotuse rikkumisele. Samuti on näha, et mediaan ja keskmine on miinimumväärtusele tunduvalt lähemal kui maksimumväärtusele. Saame arvutada välja erindite piiripunktid. Madalamas otsas ei saa olla erindeid, kõrgemas otsas on piiripunktiks 3025. Sellest punktist kõrgemaid väärtuseid on 28. Nendest 6 on äärmustlikud erindid, mille väärtus on üle 4450.
+Näha on, et brutopalga (grspnum) tulbas 1061 puuduvat väärtust. Miinimum on 0 ja maksimum on 5000. Mediaan on 1050 ja keskmine on 1203. Mediaani ja keskmise erinemine viitab normaaljaotuse rikkumisele. Samuti on näha, et mediaan ja keskmine on miinimumväärtusele tunduvalt lähemal kui maksimumväärtusele. Saame arvutada välja erindite piiripunktid. Madalamas otsas ei saa olla erindeid, kõrgemas otsas on piiripunktiks 3025. Sellest punktist kõrgemaid väärtuseid on 28. Nendest 6 on äärmustlikud erindid, mille väärtus on üle 4450.
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 andmed3 <- ee9[, c("agea", "eduyrs", "grspnum")]
 as.data.frame(stat.desc(andmed3$grspnum)) %>% 
   rename(Väärtus = "stat.desc(andmed3$grspnum)") %>% 
-  kbl() %>% 
+  kbl(caption = "Brutopalga kirjeldavad statistikud") %>% 
   kable_classic()
 
 summary(andmed3$grspnum)
 ```
-
-Siit on näha, et äärmuslikke väärtuseid võib olla üsna palju.
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
 andmed3 %>% 
   ggplot(aes(x=grspnum, fill = "green")) +
+  ggtitle("Brutopalga karpdiagramm")+
   geom_boxplot() +
   theme(legend.position = "none")+
   geom_vline(xintercept = 3025, linetype = "dashed", color ="darkgreen") +
@@ -198,16 +209,25 @@ andmed3 %>%
   annotate("text", x = 4450, y = 0.38, label = "Äärmusliku erindi piir", size = 5, color = "red")+
   theme(axis.ticks.y = element_blank()) +
   theme(axis.text.y = element_blank()) +
-  theme(axis.title.y = element_blank()) 
+  theme(axis.title.y = element_blank())+
+  xlab("Brutopalk")
 ```
 
+Tabelist on näha, et puuduvate väärtuste puhul on keskmine vanus kõrgem ja keskmised haridusaastad madalamad. Erindite puhul on keskmine vanus madalam ja haridusaastad pikemad. Äärmuslike erindite puhul jääb keskmine vanus  madalamaks kui tavaväärtuste puhul kuid kõrgemaks kui erindite puhul. Hariduaastad on äärmuslike erindite puhul pigem puuduvate väärtuste haridusaastatega sarnane.
 ```{r echo = FALSE, message = FALSE, warning = FALSE}
-andmed3 %>% 
-  filter(grspnum > 3025) %>% 
-  drop_na() %>% 
-  mutate(mean_age = mean(agea)) %>% 
-  mutate(mean_edu = mean(eduyrs)) %>% 
-  kbl() %>% 
+andmed3 %>%
+  mutate(`Väärtuse tüüp` = case_when(
+    grspnum > 3025 & grspnum < 4450 ~ "Erindid",
+    grspnum > 4450 ~ "Äärmuslikud erindid",
+    is.na(grspnum) ~ "Puuduvad väärtused",
+    TRUE ~ "Tavaväärtused"
+  )) %>% 
+  group_by(`Väärtuse tüüp`) %>% 
+  mutate(`Keskmine vanus` = mean(agea)) %>% 
+  mutate(`Keskmised haridusaastad` = mean(eduyrs)) %>%
+  select(`Väärtuse tüüp`, `Keskmine vanus`, `Keskmised haridusaastad`) %>% 
+  distinct() %>% 
+  kbl(caption = "Erindite ja vanuse ning haridusaastate suhe") %>% 
   kable_classic()
 ```
 
