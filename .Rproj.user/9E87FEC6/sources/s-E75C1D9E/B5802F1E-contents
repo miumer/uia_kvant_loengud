@@ -1,0 +1,136 @@
+---
+title: "Esimene loeng"
+author: "Siim"
+date: "2/12/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(essurvey)
+library(descr)
+library(ggplot2)
+```
+
+
+```{r}
+set_email("siimpoldre@gmail.com")
+
+### ----------- andmelüngad -----------
+
+ee9 <- import_country("Estonia", 9)
+
+# eraldame meile huvipakkuvad tunnused
+andmed <- ee9[, c("stflife", "imsmetn", "imdfetn", "impcntr", "imbgeco", "imueclt", "imwbcnt", "rlgdgr", "brncntr", "gndr", "agea", "eduyrs")]
+```
+
+```{r}
+# vaatame andmekirjeldust
+str(andmed)
+
+# kui palju on tunnustes andmelünki?
+dfSummary(andmed)
+colSums(is.na(andmed))
+sum(is.na(andmed))
+
+# kui suur on indiviidide osakaal, kellel on vähemalt ühes tunnuses andmelünk?
+sum(!complete.cases(andmed)) / nrow(andmed)
+
+# teeme indikaatortunnuse, mis näitab täielike vastustega indiviidide osakaalu andmestikus
+andmed$valiidne <- NA
+andmed$valiidne[complete.cases(andmed)] <- 1
+andmed$valiidne[!complete.cases(andmed)] <- 0
+
+# arvutame täisvastustega indiviidide osakaalu
+mean(andmed$valiidne)
+```
+
+
+```{r}
+# uurime lünkade juhuslikkust tunnuste lõikes - kas lüngad on MCAR või MAR?
+library(tidyverse)
+andmed %>%
+  group_by(gndr) %>%
+  summarise(valiid_osakaal = mean(valiidne))
+
+andmed %>%
+  group_by(valiidne) %>%
+  summarise(keskm_vanus = mean(agea))
+
+andmed$vanusegrupp <- NA
+andmed$vanusegrupp[andmed$agea >= 15] <- '15-25'
+andmed$vanusegrupp[andmed$agea >= 26] <- '26-35'
+andmed$vanusegrupp[andmed$agea >= 36] <- '36-45'
+andmed$vanusegrupp[andmed$agea >= 46] <- '46-55'
+andmed$vanusegrupp[andmed$agea >= 56] <- '56-65'
+andmed$vanusegrupp[andmed$agea >= 66] <- '66-75'
+andmed$vanusegrupp[andmed$agea >= 76] <- '76+'
+
+table(andmed$vanusegrupp)
+table(andmed$agea, andmed$vanusegrupp)
+
+andmed %>%
+  group_by(vanusegrupp) %>%
+  summarise(valiid_osakaal = mean(valiidne))
+
+valiid_vanusegrupp <- andmed %>%
+  group_by(vanusegrupp) %>%
+  summarise(valiid_osakaal = mean(valiidne))
+
+library(ggplot2)
+ggplot(valiid_vanusegrupp, aes(x = vanusegrupp, y = valiid_osakaal)) +
+  geom_point()
+
+ggplot(valiid_vanusegrupp, aes(x = vanusegrupp, y = valiid_osakaal)) +
+  geom_point() +
+  ylim(0, 1)
+
+# harjutusülesanne: vahel võib täisvastuste indiviidide osakaalu oluliselt tõsta see, kui ühe või mõne tunnuse analüüsist välja jätame, seda muidugi eeldusel, et see/need konkreetsed tunnused ei ole uurimisküsimuse jaoks kesksel kohal. Milline tunnus kõige rohkem täisvastustega indiviidide arvu n-ö kasvatab, ei saa aga hinnata pelgalt igas üksikus tunnuses esinevate andmelünkade arvu järgi, tuleb uurida lünkade esinemise struktuuri. Kui palju tõuseks iga üksiku tunnuse väljajätmisel täisvastustega indiviidide arv? Millise tunnuse väljajätmisest oleks indiviidide arvu mõttes kõige rohkem kasu? Kas kasu on märgatav, st kas see võiks üles kaaluda infokao tunnuse analüüsist väljajätmise näol?
+
+```
+
+```{r}
+### ------- erindid -----------
+
+set_email("siimpoldre@gmail.com")
+
+ee7 <- import_country("Estonia", 7)
+
+# uurime jaotusparameetreid
+descr(ee7$noimbro)
+freq(ee7$noimbro)
+
+# vaatame histogrammi
+hist(ee7$noimbro, breaks = 20)
+hist(ee7$noimbro, breaks = 40)
+
+# karpdiagramm
+boxplot(ee7$noimbro)
+
+# kui palju on erindeid karpdiagrammi / kvartiilhaarde põhjal?
+length(ee7$noimbro[ee7$noimbro > 60 & !is.na(ee7$noimbro)])
+freq(ee7$noimbro[ee7$noimbro > 60 & !is.na(ee7$noimbro)])
+
+# kui palju on erindeid z-skooride põhjal?
+ee7$noimbroZ <- as.numeric(scale(ee7$noimbro))
+freq(ee7$noimbroZ)
+
+freq(ee7$noimbro[ee7$noimbroZ > 2.5 & !is.na(ee7$noimbro)])
+freq(ee7$noimbro[ee7$noimbroZ > 3 & !is.na(ee7$noimbro)])
+freq(ee7$noimbro[ee7$noimbroZ > 3.5 & !is.na(ee7$noimbro)])
+
+# harjutusülesanne: kas tunnuse noimbro poolest erandlike väärtustega indiviidid erinevad millegi poolest tavaväärtustega indiviididest? Kas mõne indiviidi puhul torkab midagi eripärast silma, mis aitaks mõista, mis võib erandliku väärtuse põhjuseks olla?
+
+# mitmemõõtmelised erindid. Siin see nurk näitab seda, et kõik kes on karbist paremal on sellised, kellel on kõrge haridustase, aga ei oska üldse määrata välissünnikohaga inimeste arvu, sest võiks arvata, et pikema haridusega inimesed määravad paremini. Seega mitmemõõtmeline erind näitab erindit kahe tunnuse mõttes.
+ggplot(ee7, aes(x = noimbro, y = eduyrs)) +
+  geom_count() +
+  geom_segment(x = 38, y = 18.5, xend = 38, yend = 33) +
+  geom_segment(x = 38, y = 18.5, xend = 90, yend = 18.5)
+
+```
+
+
+

@@ -1,0 +1,5 @@
+"0","andmed2 %>%"
+"0","  group_by(brncntr) %>%"
+"0","  summarise(valiid_osakaal = mean(valiidne)) %>% "
+"0","  kbl() %>% "
+"0","  kable_classic"

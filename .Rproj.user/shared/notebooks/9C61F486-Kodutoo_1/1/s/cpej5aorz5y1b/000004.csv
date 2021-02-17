@@ -1,0 +1,5 @@
+"0","andmed2 %>%"
+"0","  group_by(valiidne) %>%"
+"0","  summarise(keskm_vanus = mean(agea)) %>% "
+"0","    kbl() %>% "
+"0","  kable_classic()"
