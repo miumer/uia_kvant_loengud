@@ -20,6 +20,7 @@ library("vcdExtra")
 library("ggplot2")
 library("graphics")
 library("lmtest")
+library(stats)
 ```
 
 ```{r echo = FALSE, warning = FALSE, message = FALSE}
@@ -110,6 +111,7 @@ Cnt_fr_is <- allines %>%
   rename(Frame = Frame1, Issue = Issue1)
 ```
 
+Heres a view for good in country comparison of different framings within issue
 ```{r echo = FALSE, message = FALSE, fig.dim= c(12,10)}
 Cnt_fr_is %>% 
   group_by(Country, Issue, Frame) %>% 
@@ -127,13 +129,43 @@ Cnt_fr_is %>%
   geom_bar(aes(fill = Frame), stat = "identity", position = "dodge", width = 0.8) +
   geom_text(aes(x = Country, y = n, label = paste0(n, "\n", pct), group = Frame), 
             position = position_dodge(width = 0.9), vjust = -0.5, size = 2)+
-  expand_limits(y = c(0, 30))+
+  expand_limits(y = c(0, 33))+
   annotate("text", x = 1.3, y = 30, label = "*% of issue in country", size = 2.5, color = "red")+
   facet_wrap(~ Issue) +
   ggsave("cnt_fr_is_bars.png", dpi= 350)
 ```
 
-A chi-squared test ignoring issues shows us that **Country and Framing are not associated** with $\chi^2(8, n=629)=11.208, p = .19$. That suggests that Framing is independent of the country where the news are published. Looking at the standardized residuals we see that most of them are between 2 and -2 with only the framing "Human Interest" in Estonia showing a standardized residual greater than 2 at 2.04 and with that deviating the most from what could be expected under independence. That is still barely two standard deviations and cant be considered a strong enough evidence to say at the .05 alfa level that country and framing are related.
+Heres another view to better compare framings between countries
+```{r echo = FALSE, fig.dim= c(12,10)}
+pcts2 <- Cnt_fr_is %>%
+  group_by(Country, Issue, Frame) %>% 
+  mutate(Frame = recode(Frame, a = "Attribution of responsibility", b = "Conflict", c = "Economic",
+                        d = "Human interest", e = "Morality")) %>% 
+  mutate(Issue = recode(Issue, b = "Issue: Local Elections/politics", d = "Issue: Ukraine", e = "Issue: Social Welfare",
+                      g = "Issue: Military", h = "Issue: Public Health and Safety", j = "Issue: International Relations")) %>% 
+  count() %>%
+  ungroup() %>%
+  group_by(Country, Issue) %>% 
+  mutate(pct = paste0(round((n/sum(n))*100,0),"%"))
+
+Cnt_fr_is %>%
+  mutate(Frame = recode(Frame, a = "Attribution of responsibility", b = "Conflict", c = "Economic",
+                        d = "Human interest", e = "Morality")) %>% 
+  mutate(Issue = recode(Issue, b = "Issue: Local Elections/politics", d = "Issue: Ukraine", e = "Issue: Social Welfare",
+                      g = "Issue: Military", h = "Issue: Public Health and Safety", j = "Issue: International Relations")) %>% 
+  right_join(., pcts2, by = c("Country"="Country", "Issue"="Issue", "Frame"="Frame")) %>% 
+  ggplot(., aes(x = Country, fill = Frame)) + 
+  ggtitle("Framing of issues in Estonia, Russia, and the US") +
+  theme(legend.position = "bottom") +
+  ylab("Percentage")+
+  geom_bar(position = "fill", width = 0.8) +
+  stat_count(geom = "text", 
+             aes(label = paste0(pct)),
+             position=position_fill(vjust=0.3), colour="black")+
+  facet_wrap(~ Issue) 
+```
+
+A chi-squared test ignoring issues shows us that **Country and Framing are not associated** with $\chi^2(8, n=629)=11.208, p = .12$. That suggests that Framing is independent of the country where the news are published. Looking at the standardized residuals we see that most of them are between 2 and -2.
 ```{r echo = FALSE}
 Cnt_fr <- Cnt_fr_is %>% 
   select(id, Country, Frame)
@@ -148,7 +180,7 @@ mosaicplot(table(Cnt_fr$Country, Cnt_fr$Frame), shade = TRUE, las=2,
 CrossTable(Cnt_fr$Country, Cnt_fr$Frame, chisq = TRUE, expected = TRUE, sresid = TRUE, format = "SPSS")
 ```
 
-Looking at the relationship between issue and framing (ignoring country alltogether) we can se a strong relationship $\chi^2(20, n=629)=95.45, p < .001$. As expected framing and issue are strongly related. Looking at the standardized residuals we can see that "Local Eelctions/Politics" is framed much less as "economic" than would be expected under independence; also that "Social welfare" is framed as "conflict" much less and much more as "Economic" (that also being the biggest contributor to the chi squared statistic) than would be expected if issue and frame had no relationship. Also that Public health and safety issue is framed considerably more as "Human Interest" than would be expected under independence.
+Looking at the relationship between issue and framing (ignoring country alltogether) we can se a strong relationship $\chi^2(20, n=629)=95.45, p < .001$. As expected framing and issue are strongly related. Looking at the standardized residuals we can see that "Local Eelctions/Politics" is framed much less as "economic" than would be expected under independence; also that "Social welfare" is framed as "conflict" much less and much more as "Economic" (that also being the biggest contributor to the chi squared statistic) than would be expected if issue and frame had no relationship. Also that Public health and safety issue is framed considerably more as "Human Interest" than would be expected under independence. The category Other is overwhelmingly framed as "Human interest" qway more than would be expected under independence.
 ```{r echo = FALSE}
 Is_fr <- Cnt_fr_is %>% 
   select(id, Issue, Frame)
@@ -180,9 +212,7 @@ mosaicplot(table(Cnt_is$Country, Cnt_is$Issue), shade = TRUE, las=2,
 CrossTable(Cnt_is$Country, Cnt_is$Issue, chisq = TRUE, expected = TRUE, sresid = TRUE, format = "SPSS")
 ```
 
-Moving on we will look at conditional independence to see if the relatsionhip between two variables changes when keeping the third variable at some constant level. To do a general test of the significance of that relationship we will build a log-linear model and asess the likelihood ratio of the two models after removing different two way interactions from on of the models. The results show that removing the frame and country interaction from the model, the model fit does not change significantly from a model with all possible two way interactions $\chi^2(8)=-11.288, p = 0.1859$. That tells us that generally 
-
-we can see that Essentially meaning that given an issue and telling me how it is framed i can not generally say which country we are talking about. That is the case generally and is different on certain issues.. On the other hand the dependence of Issue and Frame remains even conditioned on country. That means looking at countries separately Issues and Frames remain associated. More work needs to be done to verify these reuslts....
+Next we will build a hierarchical log-linear model to assess the relationship between variables and their interactions with the cell counts in the three-way contingency table. The significant likelihood-ratio test and the AIC show us that we can't remove any of the two-way interactions from the model. That means all the relationships between variables differ on different levels of the other variables. This in turn tells us is that the relationship between Country and Frame which is not significant ignoring Issue, is signficant when we take different Issues into account. So the relationship between country and framing changes between Issues. 
 ```{r echo = FALSE, eval = FALSE}
 Cfi_n <- Cnt_fr_is %>% 
   select(Country, Issue, Frame) %>% 
@@ -196,11 +226,15 @@ Cfi_n <- Cnt_fr_is %>%
 fit <- glm(n ~ Country + Issue + Frame +  Issue:Frame + Issue:Country + Frame:Country, family=poisson, data=Cfi_n)
 fit2<- glm(n ~ Country + Issue + Frame +  Issue:Frame + Issue:Country, family=poisson, data=Cfi_n)
 
-anova(fit, fit2)
+lrtest(fit, fit2)
 
 summary(fit)
+summary(fit2)
 ```
 
+Looking at individual fisher exact tests (because of many cells counts under 5) we can see that at .05 alpha level country and framing have a significant relationship in the issue (or collection of issues) coded as "Other" p = .003.  An alpha level of .1 could also be concidered appropriate  with low counts as we have and with that the issues of "International relations" p = 0.051 and  "Social Welfare" p = 0.051 would also be significant, but after correcting for multiple testing this effect becomes insignificant.
+
+All other issues show stronger evidence for no relationship between country and framing, meaning it is likley that countries don't frame these issues significantly differently in the population. 
 ```{r echo = FALSE, eval = FALSE}
 Cfb <- Cnt_fr_is %>% 
   filter(Issue == "b") 
@@ -217,13 +251,13 @@ Cfj <- Cnt_fr_is %>%
 Cfo <- Cnt_fr_is %>% 
   filter(Issue == "Other") 
 
-chisq.test(Cfb$Country, Cfb$Frame, simulate.p.value = TRUE)
-chisq.test(Cfd$Country, Cfd$Frame, simulate.p.value = TRUE)
-chisq.test(Cfe$Country, Cfe$Frame, simulate.p.value = TRUE)
-chisq.test(Cfg$Country, Cfg$Frame, simulate.p.value = TRUE)
-chisq.test(Cfh$Country, Cfh$Frame, simulate.p.value = TRUE)
-chisq.test(Cfj$Country, Cfj$Frame, simulate.p.value = TRUE)
-chisq.test(Cfo$Country, Cfo$Frame, simulate.p.value = TRUE)
+bfish <- fisher.test(Cfb$Country, Cfb$Frame, workspace = 2e9)
+dfish <- fisher.test(Cfd$Country, Cfd$Frame, workspace = 2e9)
+efish <- fisher.test(Cfe$Country, Cfe$Frame, workspace = 2e9)
+gfish <- fisher.test(Cfg$Country, Cfg$Frame, workspace = 2e9)
+hfish <- fisher.test(Cfh$Country, Cfh$Frame, workspace = 2e9)
+jfish <- fisher.test(Cfj$Country, Cfj$Frame, workspace = 2e9)
+ofish <- fisher.test(Cfo$Country, Cfo$Frame, workspace = 2e9)
 
 
 mosaicplot(table(Cfb$Country, Cfb$Frame), shade = TRUE, las=2,
@@ -232,23 +266,71 @@ mosaicplot(table(Cfb$Country, Cfb$Frame), shade = TRUE, las=2,
 mosaicplot(table(Cfd$Country, Cfd$Frame), shade = TRUE, las=2,
            main = "Relationship of country and frame in Ukraine", xlab = "Country", ylab = "Frame"
            )
-mosaicplot(table(Cfe$Country, Cfe$Frame), shade = TRUE, las=2,
-           main = "Relationship of country and frame in Social Welfare", xlab = "Country", ylab = "Frame"
-           )
 mosaicplot(table(Cfg$Country, Cfg$Frame), shade = TRUE, las=2,
            main = "Relationship of country and frame in Military", xlab = "Country", ylab = "Frame"
            )
 mosaicplot(table(Cfh$Country, Cfh$Frame), shade = TRUE, las=2,
            main = "Relationship of country and frame in Public Healthand safety", xlab = "Country", ylab = "Frame"
            )
-mosaicplot(table(Cfj$Country, Cfj$Frame), shade = TRUE, las=2,
-           main = "Relationship of country and frame in International relations", xlab = "Country", ylab = "Frame"
+```
+
+```{r echo = FALSE, eval = FALSE}
+CrossTable(Cfe$Country, Cfe$Frame, chisq = TRUE, expected = TRUE, sresid = TRUE, format = "SPSS")
+
+fisher.test(Cfe$Country, Cfe$Frame, workspace = 2e9)
+
+mosaicplot(table(Cfe$Country, Cfe$Frame), shade = TRUE, las=2,
+           main = "Relationship of country and frame in Social Welfare", xlab = "Country", ylab = "Frame"
            )
+```
+
+```{r echo = FALSE, eval = FALSE}
+CrossTable(Cfo$Country, Cfo$Frame, chisq = TRUE, expected = TRUE, sresid = TRUE, format = "SPSS")
 
 mosaicplot(table(Cfo$Country, Cfo$Frame), shade = TRUE, las=2,
            main = "Relationship of country and frame in Other", xlab = "Country", ylab = "Frame"
            )
+fisher.test(Cfo$Country, Cfo$Frame, workspace = 2e9)
+```
 
-CrossTable(Cfb$Country, Cfb$Frame, chisq = TRUE, expected = TRUE, sresid = TRUE, format = "SPSS")
+```{r echo = FALSE, eval = FALSE}
+CrossTable(Cfj$Country, Cfj$Frame, chisq = TRUE, expected = TRUE, sresid = TRUE, format = "SPSS")
+
+mosaicplot(table(Cfj$Country, Cfj$Frame), shade = TRUE, las=2,
+           main = "Relationship of country and frame in International relations", xlab = "Country", ylab = "Frame"
+           )
+
+fisher.test(Cfj$Country, Cfj$Frame, workspace = 2e9)
+```
+
+Looking at these graphs again we can see that within "International relations" the biggest deviance from expected values comes from Estonia framing it conciderably more as "Human Interest" and less as "Economic" or "Conflict". In "Social Welfare" the US used the "Economic" framing more "Human Interest" not at all and Estonia used "Human interest" much more than could be expected under independence. Looking at the category "Other" we can see that in Estonia most of these articles are framed as "Human Interest" while in Russia "Economic" and "Attribution of responsibility" is used in these issues under "Other". The differences are quite visible but in the cases of international relations and social welfare their statistical significance is under question. Most of the significant differences between countries in framing comes from the category "Other"
+```{r echo=FALSE}
+pcts <- Cnt_fr_is %>%
+  filter(Issue == "e" | Issue == "j" | Issue == "Other") %>% 
+  group_by(Country, Issue, Frame) %>% 
+  mutate(Frame = recode(Frame, a = "Attribution of responsibility", b = "Conflict", c = "Economic",
+                        d = "Human interest", e = "Morality")) %>% 
+  mutate(Issue = recode(Issue, e = "Issue: Social Welfare", j = "Issue: International Relations")) %>% 
+  count() %>%
+  ungroup() %>%
+  group_by(Country, Issue) %>% 
+  mutate(pct = paste0(round((n/sum(n))*100,0),"%"))
+
+Cnt_fr_is %>%
+  filter(Issue == "e" | Issue == "j" | Issue == "Other") %>% 
+  mutate(Frame = recode(Frame, a = "Attribution of responsibility", b = "Conflict", c = "Economic",
+                        d = "Human interest", e = "Morality")) %>% 
+  mutate(Issue = recode(Issue, e = "Issue: Social Welfare", j = "Issue: International Relations")) %>% 
+  right_join(., pcts, by = c("Country"="Country", "Issue"="Issue", "Frame"="Frame")) %>% 
+  ggplot(., aes(x = Country, fill = Frame)) + 
+  ggtitle("Framing of issues in Estonia, Russia, and the US") +
+  theme(legend.position = "bottom") +
+  ylab("Percentage")+
+  geom_bar(position = "fill", width = 0.8) +
+  stat_count(geom = "text", 
+             aes(label = paste0(pct)),
+             position=position_fill(vjust=0.3), colour="black")+
+  facet_wrap(~ Issue) +
+  ggsave("cnt_fr_is_stack.png", dpi= 350)
 ```
 
