@@ -83,11 +83,11 @@ ggqqplot(essee18$indekssum, weights=essee18$pspwght)
 # Teeme loodud indeksiga lineaarse regressioonimudeli
 
 
-indmudel <- lm(indekssum ~ agea, data=essee18, weights=pspwght)
+indmudel1 <- lm(indekssum ~ agea, data=essee18, weights=pspwght)
 
-indmudel
+indmudel1
 
-summary(indmudel)
+summary(indmudel1)
 
 
 # Kontrollime eeldusi
