@@ -45,6 +45,8 @@ essee18 <-
     rounds = c(9),
     format="spss"
   )
+
+
 ```
 ```{r}
 # Vaatame sõltuva tunnuse jaotust ja teisendame andmeid, et oleks rohkem normaaljaotus
@@ -117,6 +119,7 @@ essee18$vanuskuup <- essee18$agea * essee18$agea * essee18$agea
 sissmudel <- lm(juursiss ~ agea + vanusruut + vanuskuup + as.factor(gndr)+ Haridus + wkhtot + Rahvusvahemus + Regioon, data=essee18, weights=pspwght)
 
 summary(sissmudel)
+
 
 ```
 

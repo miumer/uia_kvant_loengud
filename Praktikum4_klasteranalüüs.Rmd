@@ -1,0 +1,650 @@
+---
+title: "Praktikum 4"
+author: "Siim"
+date: "3/26/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Klasteranalüüs
+
+Harjutame klasteranalüüsi Euroopa Sotsiaaluuringu 2016. aasta Eesti andmete põhjal. 
+# Eesmärk on leida erinevate rahuloludimensioonide alusel eristuvad grupid elanikkonna seas.
+
+Laeme kõigepealt alla vajaliku paketi ja andmed.
+
+```{r}
+library(essurvey)
+
+set_email("siimpoldre@gmail.com") 
+ee8 <- import_country("Estonia", 8)
+```
+
+
+Eraldame alamandmestiku, kus on rahulolu tunnused ja lisaks mõni taustatunnus.
+
+```{r}
+stf <- ee8[, c("idno", "stflife", "stfeco", "stfgov", "stfdem", "stfedu", "stfhlth", "gndr", "eduyrs", "pspwght")]
+```
+
+
+Indiviididevaheliste kauguste arvutamine 
+
+Harjutame enne klasterdamise juurde minekut veel indiviididevaheliste kauguste arvutamist, et seda intuitiivselt paremini mõista. Võtame näiteks andmestiku viis esimest indiviidi ja nende väärtused kõigepealt tunnuses stflife:
+
+```{r}
+stf[1:5, 2]
+```
+
+
+Arvutame indiviididevahelised kaugused ainult ühe tunnuse väärtuste põhjal:
+
+```{r}
+dist(stf[1:5, 2])
+```
+
+Kaugused on sirgjoonelised ja seetõttu on kaugus puhtalt ühe indiviidi väärtus tunnuses miinus teise indiviidid väärtus tunnuses.
+
+Vaatame, millised on indiviidide väärtused ka tunnuses stfeco (rahulolu majanduse olukorraga).
+
+```{r}
+stf[1:5, 2:3]
+```
+
+Arvutame indiviididevahelised eukleidilised kaugused (kaugused linnulennult) tunnuste stflife ja stfeco väärtuste põhjal:
+
+```{r}
+dist(stf[1:5,2:3])
+```
+
+
+Näeme maatriksist, et esimese ja teise rea indiviidi kaugus on 3,61. See on saadud Pythagorase teoreemi rakendades - kui arvutame selle alloleva lahtikirjutuse põhjal, saame täpselt sama vastuse.
+
+```{r}
+sqrt((9-7)^2 + (7-4)^2)
+```
+
+Sama põhimõtte järgi käib kauguste arvutamine ka suurema hulga tunnuste puhul:
+
+```{r}
+stf[1:5, 2:7]
+dist(stf[1:5, 2:7])
+```
+
+Esimese ja teise indiviidi vahelise eukleidilise kauguse arvutustehe kuue tunnuse lõikes on
+
+```{r}
+sqrt((9-7)^2 + (7-4)^2 + (4-2)^2 + (7-2)^2 + (6-8)^2 + (7-6)^2)
+```
+
+Funktsioon dist võimaldab ka teist liiki kauguste arvutamist, nt Manhattani ehk linnakaugust: vt käsku küsimärgiga funktsiooni nimetuse ees:
+
+
+```{r}
+?dist
+```
+
+Nt linnakaugused: 
+
+```{r}
+stf[1:5, 2:7]
+dist(stf[1:5, 2:7], method = "manhattan")
+```
+
+Mille alusel arvutab kaugused method = "maximum"?
+
+Proovime ka Jaccardi kauguste arvutamist, selleks võtame kaheväärtuselised tunnused, kus on andmed selle kohta, kas vastaja on olnud viimase 12 kuu jooksul erinevatel viisidel ühiskondlikult aktiivne (ankeedis B15-B22). Funktsioon dist eeldab, et tunnustes on nullid ja ühed, meil on ühed ja kahed, muudame selle ümber.
+
+```{r}
+plt <- ee8[, 52:59]
+plt[plt == 2] <- 0
+
+plt[1:15,]
+round(dist(plt[1:15,], method = "binary"), 2)
+
+library(descr)
+freq(round(dist(plt[1:15,], method = "binary"), 2))
+```
+
+Hierarhiline klasteranalüüs ####
+
+Teeme harjutuseks läbi Toodingu raamatus olevad näited ja vaatame, kuidas vastavad klasterdused näevad välja liigituspuul.
+
+Kõigepealt teeme näiteandmestiku.
+
+```{r}
+horisontaalne <- c(1:6)
+vertikaalne <- c(4, 3, 1, 3, 5, 3)
+naide <- data.frame(horisontaalne, vertikaalne)
+rownames(naide) <- c("A", "B", "C", "D", "E", "F")
+View(naide)
+```
+
+Arvutame kaugused
+
+```{r}
+d <- dist(naide)
+d
+```
+
+Kõik slaididel nähtud hierarhilised klasterdusmeetodid on R-s kasutatavad funktsiooniga hclust, meetodi saab täpsustada argumendiga method.
+
+Ühe seose meetod
+
+```{r}
+hclust(d, method = "single")
+d_single <- hclust(d, method = "single")
+plot(d_single)
+```
+
+Täieliku seose meetod
+
+```{r}
+d_complete <- hclust(d, method = "complete")
+plot(d_complete)
+```
+
+Klastritevahelise keskmise kauguse meetod
+
+
+```{r}
+d_average <- hclust(d, method = "average")
+plot(d_average)
+```
+
+Wardi meetod
+
+
+```{r}
+d_ward <- hclust(d, method = "ward.D2")
+plot(d_ward)
+```
+
+
+Nagu näha, suuri erinevusi antud näite puhul eri klasterdusmeetodite puhul ei ilmnenud, välja arvatud ühe seose meetodi puhul. Rohkemate indiviidide ja tunnuste puhul võivad erinevused siiski olla märkimisväärsed.
+
+Harjutusülesanded
+
+1) Laadige R-i andmestik http://www.ut.ee/~indrekso/sotsanalmeet/econfreedom2.csv . Viige majandusvabaduse indeksi aluseks olevate tunnustega (veerud 6-17) läbi hierarhiline klasteranalüüs erinevate meetoditega. Kontrollige eelnevalt, kas tunnuseid oleks vaja standardiseerida. z-skooride arvutamiseks saab R-s kasutada käsku scale (vaja on ainult ühte argumenti). Võrrelge tulemusi - millised annavad kompaktseima või sisuliselt paremini tõlgendatava tulemuse? Milliste riikidega kokku kuulub Eesti? Kas see tundub sisuliselt loogiline?
+
+```{r}
+econdat <- read.csv2("http://www.ut.ee/~indrekso/sotsanalmeet/econfreedom2.csv")
+```
+
+2) Eraldage Euroopa riikide andmed. Viige läbi klasterdamine Wardi meetodil. Kontrollige eelnevalt, kas tunnuseid oleks vaja standardiseerida. Kas näete klasterstruktuuris mingit loogilist mustrit? Kas Eesti grupikuuluvus tundub loogiline? Milliste riikidega on Eesti kõige sarnasem?
+
+Proovin ise lahendada
+
+```{r}
+library(tidyverse)
+
+#Kas stanardhälve on sarnane?
+econdat %>% 
+  filter(Region == "Europe") %>% 
+  select(c(1, 6:17)) %>% 
+  summarise(across(2:13, sd, na.rm=TRUE)) 
+
+#Kas skaala on sarnane
+scal_econ <- econdat %>% 
+  filter(Region == "Europe") %>% 
+  select(c(1, 6:17)) %>% 
+  mutate(across(c(2:13), scale)) %>% 
+  drop_na() %>% 
+  column_to_rownames("Country.Name")
+
+d <- dist(scal_econ)
+
+scaled_ward <- hclust(d, method = "ward.D2")
+plot(scaled_ward)
+```
+
+3) Jätkame Euroopa andmetega. Kas klasterdus andis õieti midagi juurde juba koostatud indeksile? Mille alusel saaks seda hinnata? 
+
+Kui vaatame klastreid, ja indeksi väärtuseid,siis saame vaadata,kas klasterdus ühtib indeksiga. Kui riigid, mis peaksid indeksi järgi olema sarnased, pole ühes klastris, siis pole indeks väga hea kirjeldus. Selleks tuleks vaadata klastrite sisu ja seda, mis on indeksiskoor. 
+
+4) Jagades riigid viiese klasterduse alusel, uurige lähemalt gruppi, kuhu kuulub Eesti, st uurige 12 tunnuse väärtusi nende riikide lõikes. Mille poolest sarnaneb Eesti enamikule riikidele kõige rohkem? Kus on suurimad erinevused? 
+
+Siin ülesande õpetaja lahenduse kood:
+
+```{r}
+nrow(na.omit(econ))
+nrow(econ)
+nrow(na.omit(econ)) / nrow(econ)
+econ2 <- na.omit(econ)
+
+library(psych)
+psych::describe(econ2[6:17])
+
+econ2[6:17] <- scale(econ2[6:17])
+View(econ2)
+
+rownames(econ2) <- econ2$Country.Name
+d <- stats::dist(econ2[6:17])
+
+# Ühe seose meetod
+hclust(d, method = "single")
+d_single <- hclust(d, method = "single")
+plot(d_single, cex = 0.5)
+
+# Täieliku seose meetod
+d_complete <- hclust(d, method = "complete")
+plot(d_complete, cex = 0.5)
+
+# Klastritevahelise keskmise kauguse meetod
+d_average <- hclust(d, method = "average")
+plot(d_average, cex = 0.5)
+
+# Wardi meetod
+
+d_ward <- hclust(d, method = "ward.D2")
+plot(d_ward, cex = 0.5)
+
+
+
+econ2$ward4 <- cutree(d_ward, 4)
+
+econ2$ward4[econ2$Country.Name == "Estonia"]
+econ2$Country.Name[econ2$ward4 == 3]
+
+# Euroopa andmed
+
+econ_eur <- na.omit(econ[econ$Region == "Europe",])
+
+econ_eur$Country.Name
+rownames(econ_eur) <- econ_eur$Country.Name
+econ_eur2 <- econ_eur
+econ_eur2[6:17] <- scale(econ_eur[6:17])
+d_eur2 <- stats::dist(econ_eur2[6:17])
+
+d_eur2_ward <- hclust(d_eur2, method = "ward.D2")
+plot(d_eur2_ward, cex = 0.75)
+
+econ_eur2$ward5 <- cutree(d_eur2_ward, 5)
+
+econ_eur2$Country.Name[econ_eur2$ward5 == 1]
+econ_eur2$Country.Name[econ_eur2$ward5 == 2]
+econ_eur2$Country.Name[econ_eur2$ward5 == 3]
+econ_eur2$Country.Name[econ_eur2$ward5 == 4]
+econ_eur2$Country.Name[econ_eur2$ward5 == 5]
+
+econ_eur2 %>%
+  group_by(ward5) %>%
+  summarise(mean = mean(X2021.Score), rank_med = median(Region.Rank))
+
+econ_eur2 <- econ_eur2[order(econ_eur2$Region.Rank), c(1:5, 18)]
+View(econ_eur2)
+
+econ_eur_ward5_grest <- econ_eur[econ_eur$ward5 == 5,]
+nrow(econ_eur_ward5_grest)
+
+ggplot(econ_eur_ward5_grest, aes(x = Country.Name, y = Property.Rights)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_hline(yintercept = 5) +
+  xlab("Klastrid") +
+  ylab("Rahulolu keskmine") + 
+  labs(fill = "Rahulolu")
+
+```
+
+
+### Klasteranalüüs k-keskmiste meetodiga
+
+Siin on allalaetud andmete (kahe rahulolu tunnuse) põhjal väike demo, kuidas k-keskmiste põhjal klastrite arvutamine käib (pole oluline programmilõigust aru saada, vaid jälgida all paremal lehel Plots toimuvat - minge sellele lehele enne programmilõigu käivitamist). Antud näites k = 3 ehk tsentroide on kolm ja indiviidid paigutatakse kolme klastrisse.
+
+```{r}
+install.packages("animation")
+library(animation)
+
+ani.options(interval = 1)
+par(mar = c(3, 3, 1, 1.5), mgp = c(1.5, 0.5, 0))
+kmeans.ani(na.omit(stf[2:3]), centers = 3, hints = c("Move centers!", "Find cluster?"), pch = 1:3, col = 1:3)
+```
+
+
+Läheme edasi oma näitega. Enne kui klasterdamise juurde asuda, tuleks järgi uurida põhilised tunnuste jaotusparameetrid. Kuna rahulolu tunnused on mõõdetud skaalal nullist kümneni, kus ainult skaala otspunktid on sõnaliselt defineeritud, siis võime eeldada, et vastajad on tajunud skaalapunktide vahesid võrdsetena ja tunnuseid võib käsitleda arvulistena.
+
+```{r}
+summarytools::descr(stf[2:7]) # kui pakett summarytools ei taha töötada, saab põhilise info kätte ka kahe järgmise käsuga
+library(psych)
+psych::describe(stf[2:7])
+```
+
+Mida olulist selle käsuga teada saime? Rahulolu tunnuste keskmised ja mediaanid on üsna sarnased, st suurt ebasümmeetrilisust andmetes ei tohiks olla, asümmeetriakordaja on -0,5 ja -1 vahel kahel tunnusel, teistel nullile lähemal. Mõjukaid erindeid ei ole juba seetõttu, et tunnused on piiratud skaalaga (nullist kümneni). Kvantiilide piirid küll mõnevõrra erinevad, seega hajuvust võiks lisaks kontrollida nt standardhälbe põhjal - see ei erine väga palju, 2,1-st kuni 2,4-ni. Antud tulemus on oluline selle osas, kas tunnuseid tuleks enne klasterdamist standardiseerida. Kõik tunnused on mõõdetud samal skaalal, aga kui mõne tunnuse hajuvus on märkimisväärselt suurem, omandab ta indiviididevaheliste kauguste arvutamisel suurema kaalu. Praegusel juhul võib tunnuseid standardiseerida (nt z-skooride abil), aga tingimata vajalik see ehk ei ole. 
+
+Lisaks on näha, et puuduvaid väärtuseid on mõnes tunnuses üksjagu. Kuna k-keskmiste meetodi puhul ei tohi indiviidil klasterduse aluseks olevatest tunnustest üheski puuduvaid väärtuseid esineda, on oluline vaadata, kui suurel osal indiviididest on vähemalt ühes tunnuses puuduv väärtus.
+
+```{r}
+nrow(na.omit(stf))
+nrow(stf)
+nrow(na.omit(stf)) / nrow(stf)
+```
+
+Andmelüngad puuduvad 93% indiviididest, st 7% indiviide jääks praegu analüüsist välja. Sellise protsendi puhul oleks mõnevõrra julge eeldada, et lüngad on täiesti juhuslikud, mis on probleem edasises analüüsis saadavate tulemuste populatsioonile üldistamise suhtes. On erinevaid meetodeid, kuidas andmelünki teiste tunnuste kaasabil täita, aga me ei jõua neid selles kursuses käsitleda, seetõttu tuleb lihtsalt andmelünkade osakaal meeles pidada ja seda tulemuste tõlgendamisel meeles pidada. Täpsemaks andmelünkade analüüsiks võib rakendada esimeses loengus õpitut.
+
+Enne klasterdamist seame paika juhuarvugeneraatori
+
+set.seed(20)
+
+Teeme kõigepealt lihtsama näite klasterdusest kahe tunnuse alusel, siis on tulemus intuitiivselt lihtsamini mõistetav. Arvutame klastrid k-keskmiste meetodil, võtame kõigepealt klastrite arvuks kolm.
+
+```{r}
+kmeans(stf[, 2:3], centers = 3, iter.max = 30)
+```
+
+Mida ütleb veateade? Klasterdusmeetodile ei meeldi puuduvad väärtused tunnustes. Loome uue andmestiku, kust on eemaldatud indiviidid, kellel on mõnes tunnuses andmelünk.
+
+```{r}
+stf_f <- na.omit(stf)
+```
+
+Teeme klasterduse uuesti.
+
+```{r}
+stf_km3 <- kmeans(stf_f[2:3], centers = 3, iter.max = 30)
+stf_km3
+```
+
+Saadud tulemused võivad igaühel veidi erineda, sest tsentroidide algpunktid võetakse juhuslikud. Klastrite koosseisud võivad seetõttu olla erinevate klasterduste puhul erisugused, sõltudes tsentroidide algpunktidest. Selle vältimiseks on mõistlik teha mitmeid klasterdusi ja valida neist välja see, kus klastrisiseste ruuthälvete (ehk klastrisse kuuluvate indiviidide vaheliste kauguste ruutude) summa on väikseim. R teeb seda ise, kui lisame funktsioonile kmeans argumendi nstart, millele väärtuse omistamisega saame ette anda, mitu klasterdust R kulisside taga läbi viib. Vaikeseadena on argumenti nstart väärtus 1 ehk viiakse läbi ainult üks klasterdus, see väärtus võiks olla suurem.
+
+Lisame argumendi nstart. Kui R hakkab pilduma veateateid 'Unknown or uninitialised column', siis neid võib ignoreerida, see on mingi R-i diagnostika kala.
+
+```{r}
+stf_km3 <- kmeans(stf_f[2:3], centers = 3, iter.max = 30, nstart = 25)
+stf_km3
+```
+
+
+Et nstart = 25 annab stabiilsed tulemused, näeme ka sellest, et kui seda käsku mitu korda jooksutame, saame samad (või minimaalselt erinevad) tulemused. Veendume selles ise, arvutades samade seadetega (ja nstart vaikeseadena 1) sada klasterdust, salvestame igaühe kohta lõplikud tsentroidide asukohad ja klastrisiseste ruuthälvete summa.
+
+Enne seda loome tühja andmetabeli ja vektori, kuhu nimetatud näitajaid sisestada.
+
+```{r}
+centers <- data.frame(stflife = double(),
+                      stfeco = double())
+totwss <- vector()
+```
+
+
+Teeme for-loopi abil 100 klasterdust.
+
+```{r}
+for (i in (1:100)) {
+  stf_kma <- kmeans(stf_f[2:3], centers = 3, iter.max = 30)
+  centers <- rbind(centers, stf_kma$centers)
+  totwss[i] <- stf_kma$tot.withinss
+}
+```
+
+Teeme tsentroidide hajuvusdiagrammi ja klastrisiseste ruuth?lvete summa histogrammi
+
+```{r}
+plot(centers[,1], centers[,2])
+hist(totwss)
+```
+
+Hajuvusdiagrammilt näeme, et erinevaid tsentroidide lõpp-punkte on palju - mitte küll sada, sest osad kattuvad, aga siiski üsna palju ja erinevates kohtades üle tunnuste skaala. Histogrammilt on näha, et kuigi kolmveerandil klasterdustest on ruuthälvete summa vahemikus 5800 kuni 6000, siis ka see võib varieeruda osadel juhtudel päris palju (osade klasterduste puhul on klastrisisesed kaugused suuremad, st klastrid ei ole niivõrd kompaktsed ja eristatavad).
+
+Teeme sada klasterdust läbi, kui nstart = 25. Sisuliselt saame sada klasterdustulemust, millest igaühe puhul on omakorda läbi tehtud 25 klasterdust ja neist valitud parim tulemus (ehk kokku 100 * 25 = 2500 klasterdust).
+
+```{r}
+centers <- data.frame(stflife = double(),
+                      stfeco = double())
+totwss <- vector()
+
+for (i in (1:100)) {
+  stf_kma <- kmeans(stf_f[2:3], centers = 3, iter.max = 30, nstart = 25)
+  centers <- rbind(centers, stf_kma$centers)
+  totwss[i] <- stf_kma$tot.withinss
+}
+plot(centers[,1], centers[,2])
+```
+
+Erinevaid tsentroidide lõpp-punkte on väga vähe, saadud klastrite keskpunktid on stabiilsed.
+
+
+```{r}
+hist(totwss)
+```
+
+Praktiliselt kõik klasterdused on sama klastrisiseste kauguste summaga, ainult mõni üksik erineb, kuid väga vähe. Seega on alati mõttekas kasutada argumenti nstart ja seada sellele ühest suurem väärtus. Aga kui suur vähemalt? 25 peaks olema piisav, sellest väiksema väärtuse võiks võtta juhul, kui andmeid on väga palju ja klasterdus võtab palju aega.
+
+Võtame järgnevalt aluseks eelnevalt tehtud klasterduse, kus nstart = 25 ja vaatame, kuidas klastrid paiknevad klastrite aluseks olevate tunnuste väärtuste lõikes, lisame hajuvusdiagrammile ka klastrite tsentroidid rombidena.
+
+
+```{r}
+# Lisame andmestikku, kus on klasterduse aluseks olnud tunnused, klasterduse tulemuste objektist klastrikuuluvuse tunnuse
+stf_f$clust <- as.factor(stf_km3$cluster) 
+```
+
+```{r}
+# Lisame andmestikku, kus on klasterduse aluseks olnud tunnused, klasterduse tulemuste objektist klastrikuuluvuse tunnuse
+stf_f$clust <- as.factor(stf_km3$cluster) 
+```
+
+```{r}
+library(ggplot2)
+
+ggplot(stf_f, aes(x=stflife, y=stfeco, colour = clust)) +
+  geom_count() +
+  geom_point(data = as.data.frame(stf_km3$centers), aes(x=stflife, y=stfeco, shape = 9, colour = rownames(stf_km3$centers), size = 100)) +
+  scale_shape_identity() +
+  scale_x_continuous(breaks = seq(0, 10, 2)) +
+  scale_y_continuous(breaks = seq(0, 10, 2))
+```
+
+Jooniselt on näha, et kuigi kahe tunnuse lõikes ei eristu selgeid gruppe (ei ole ringide kobaraid, pigem ühtlane seos, et mida kõrgem on rahulolu eluga, seda kõrgem on rahulolu majandusega), on klasterduse alusel leitud siiski grupid, mis ei paikne täpselt ühel diagonaalil. Ühes grupis on need, kelle rahulolu on mõlemas dimensioonis üldiselt madal või keskmine, ühes need, kellel üldiselt kumbki rahulolu on kõrge, ja ühes need, kes on küll eluga üldiselt rahul, kuid majanduse olukorraga pigem mitte. Kõige rohkem sisulist huvi võikski pakkuda see viimane grupp - kes nad on teiste tunnuste lõikes ja mis võib olla põhjuseks, et madal rahulolu majandusega ei kajastu rahulolus eluga üldiselt. Siiski võiks enne vaadata, kas kolm klastrit on üleüldse optimaalne jaotus. Meenutame, et k-keskmiste alusel klasterdamise aluseks on klastrisisesed kaugused - mida väiksemad kaugused (ruuthälbed), seda homogeensem on klaster. Saaksime eelpool kasutatud funktsiooniga kmeans teha läbi klasterdused erineva arvu klastritega ja arvutada igal juhul klastrisiseste ruuthälvete summa kõigi klastrite peale kokku ning võrrelda saadud tulemusi. Seda saab aga meie eest teha paketis factoextra olev käsk, mis teeb tulemuste alusel ka joonise:
+
+
+```{r}
+install.packages("factoextra")
+library(factoextra)
+
+fviz_nbclust(stf_f[2:3], kmeans, method = "wss")
+```
+
+Joonise alusel tundub, et ruuthälvete summa väheneb alates neljast klastrist juba vähenevas tempos (hinnang on on teatud määral subjektiivne), seega proovime ka neljast klasterdust.
+
+```{r}
+
+stf_km4 <- kmeans(stf_f[2:3], centers = 4, iter.max = 30, nstart = 25)
+stf_km4
+
+stf_f$clust4 <- as.factor(stf_km4$cluster)
+
+ggplot(stf_f, aes(x=stflife, y=stfeco, colour = clust4)) +
+  geom_count() +
+  geom_point(data = as.data.frame(stf_km4$centers), aes(x=stflife, y=stfeco, shape = 9, colour = rownames(stf_km4$centers), size = 100)) +
+  scale_shape_identity() +
+  scale_x_continuous(breaks = seq(0, 10, 2)) +
+  scale_y_continuous(breaks = seq(0, 10, 2))
+```
+
+
+Nagu jooniselt näha, on klastrite jaotus sisulises plaanis jäänud samaks, lisandunud on üks klaster, kus enamus indiviide on nii majanduse kui üldise rahulolu dimensioonis skaala keskel või majandusega rahul ja eluga üldiselt mitte eriti. Samas ei ole klastrite piirid väga konkreetsed, nt mõlemas dimensioonis rahulolematute hulgas on ka neid, kes eluga on üsna rahul (7), aga majanduse olukorraga üldse mitte (0). Tekib küsimus, kas pole mõttekam ise indiviidid selgepiirilisemalt ära jaotada, nt nii:
+
+```{r}
+stf_f$clust4g[stf_f$stflife <= 5 & stf_f$stfeco < 5] <- 1
+stf_f$clust4g[stf_f$stflife > 5 & stf_f$stfeco < 5] <- 2
+stf_f$clust4g[stf_f$stflife <= 5 & stf_f$stfeco >= 5] <- 3
+stf_f$clust4g[stf_f$stflife > 5 & stf_f$stfeco >= 5] <- 4
+
+ggplot(stf_f, aes(x=stflife, y=stfeco, colour = clust4g)) +
+  geom_count() +
+  scale_shape_identity() +
+  scale_x_continuous(breaks = seq(0, 10, 2)) +
+  scale_y_continuous(breaks = seq(0, 10, 2)) +
+  geom_hline(yintercept = 4.5) +
+  geom_vline(xintercept = 5.5)
+```
+
+Kui kahe tunnuse ühisjaotuses selgesti eristatavaid gruppe ehk kobaraid ei esine (nagu antud näites), siis võib see lähenemine kas või tõlgenduslikult tõesti parem ja lihtsam olla. Küll aga oleks taolist lähenemist keeruline rakendada, kui tunnuseid oleks rohkem kui kaks või kolm, nii et kahemõõtmelisele hajuvusdiagrammile neid asetada ei saaks. 
+
+Proovimegi nüüd arvutada klastrid, võttes arvesse indiviididevahelisi kauguseid kõigi kuue rahulolu tunnuse lõikes.
+
+Kontrollime ka eelnevalt, kas tunnuste alusel võiks leiduda loomulikke klastreid.
+
+
+```{r}
+get_clust_tendency(stf_f[2:7], 40, graph = F)
+```
+
+Tulemuseks saame Hopkinsi statistiku, mille väärtus 0,5 või alla selle näitab, et loomulikke klastreid antud tunnuste alusel ei tuvastata. Hopkinsi statistik ei ole siiski probleemideta, ja klasterdus võib omada sisulist tähendust ka juhul, kui andmetes ei esine loomulikke klastreid.
+
+Vaatame, milline oleks sobiv klastrite arv kuue tunnuse puhul.
+
+```{r}
+fviz_nbclust(stf_f[2:7], kmeans, method = "wss")
+```
+
+Siin selget n-ö küünarnukki või nurka ei teki, võiksime teha nii kolme kui nelja kui viie klastriga, võtame praegu neljase variandi ja teeme klasterduse läbi.
+
+```{r}
+stf_km4v6 <- kmeans(stf_f[2:7], centers = 4, iter.max = 30, nstart = 25)
+stf_km4v6
+```
+
+Enne sisulisema analüüsi juurde minekut võiks veel uurida, kas kõik tunnused on ühesuguse eristusvõimega klastrite moodustamise seisukohalt. Kas mõni tunnus lisab ainult müra ja oleks mõttekas ta klastrite moodustamisest välja jätta?
+
+```{r}
+library(corrplot)
+corrplot(cor(stf_f[2:7]), method = "number")
+
+tot <- data.frame(tot.withinss = double(),
+                  totss = double(),
+                  tot.withinss.perc = double())
+
+for (i in (1:6)) {
+  stf5 <- stf_f[2:7]
+  stf5 <- stf5[-i]
+  stf_kma <- kmeans(stf5, centers = 4, iter.max = 30, nstart = 25)
+  tot[i,1] <- stf_kma$tot.withinss
+  tot[i,2] <- stf_kma$totss
+  tot[i,3] <- stf_kma$tot.withinss / stf_kma$totss
+}
+round(tot, 3)
+```
+
+Mida eelnev for-loop teeb? Mida tulemustest j?reldame?
+
+Tulemustest n?eme (esimene veerg), et v?ikseima klastrisiseste ruuth?lvete summa saavutaksime viimasel juhul ehk siis, kui v?lja j?tta rahulolu tervishoius?steemiga. Erinevused ei ole siiski v?ga suured ja t?hele tuleb panna ka, et sellise tunnuste komplekti puhul on koguhajuvus samuti natuke v?iksem. Viimases veerus olevad n?itajad n?itavad, et klastrisisene hajuvus moodustab sama suure osa koguhajuvusest ka esimesel ja viiendal juhul, nii et ?hte konkreetset tunnust praegusest komplektist v?lja j?tta oleks keeruline. Pealegi ei saa n-? mudeli lihtsamaks tegemisel arvestada ainult tehnilisi n?itajaid, vaid eelk?ige klasterdamise teoreetilist ja sisulist tausta ehk mille alusel sisuliselt indiviide grupeeriksime, kui mingi tunnuse (rahulolu dimensiooni) kaasaksime v?i v?lja j?taksime.
+
+Et aimu saada, kuidas eri tüüpi rahulolu poolest sarnased indiviidid (klastrid) erinevad teistest, uurime, milline on klastrite koosseis ehk mille poolest ja kuidas klastrid eristuvad klastrite moodustamise aluseks olnud tunnuste seisukohalt. 
+
+
+```{r}
+library(tidyverse)
+
+stf_f$clust4v6 <- as.factor(stf_km4v6$cluster)
+
+means <- stf_f %>%
+  group_by(clust4v6) %>%
+  summarise(
+    m_stflife = mean(stflife),
+    m_stfeco = mean(stfeco),
+    m_stfgov = mean(stfgov),
+    m_stfdem = mean(stfdem),
+    m_stfedu = mean(stfedu),
+    m_stfhlth = mean(stfhlth)
+  )
+
+install.packages("reshape2")
+library(reshape2)
+
+means2 <- melt(means, id=c("clust4v6"))
+
+ggplot(means2, aes(x = clust4v6, y = value, group = variable, fill = variable)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  geom_hline(yintercept = 5) +
+  xlab("Klastrid") +
+  ylab("Rahulolu keskmine") + 
+  labs(fill = "Rahulolu")
+```
+
+
+?ldine rahulolu eluga on ?le skaala keskpunkti k?igis klastrites, sellegipoolest on k?igil klastritel oma
+erip?ra. Selgelt eristuvad esimene ja teine klaster (NB! klastrite j?rjekorranumbrid v?ivad teil erineda), kusrahulolu on k?igis dimensioonides vastavalt madalaim v?i k?rgeim. Omap?rane ja huvitavam on kolmas klaster, kus eri dimensioonides on rahulolu gruppide l?ikes kolmandal kohal, aga rahulolu haridus- ja tervishoius?steemiga on peaaegu k?rgeim. Seega v?ib ?elda, et esineb grupp, kus rahulolu haridus- ja tervishoius?steemiga hinnatakse k?rgemalt, hoolimata madalamast rahulolust muudes eluvaldkondades.
+
+Kas klastrid erinevad kuidagi soolise tasakaalu v?i haridustee pikkuse poolest?
+
+```{r}
+means_ge <- stf_f %>%
+  group_by(clust4v6) %>%
+  summarise(
+    m_gndr = mean(gndr - 1),
+    m_eduyrs = mean(eduyrs)
+  )
+
+```
+
+Arvutasime siin keskmise soo tunnusest, mis v?ib tekitada k?simusi - kuidas v?iks olla ?igustatud nominaaltunnusest
+keskmise arvutamine? Antud juhul on tegu kahev??rtuselise tunnusega, seega juhul, kui ?he kategooria kood on null ja
+teise oma ?ks, siis saame keskmise arvutamisel teise kategooria osakaalu (sisuliselt naiste protsendi k?igist indiviididest).
+
+```{r}
+ggplot(means_ge, aes(x = m_eduyrs, y = m_gndr, colour = clust4v6, size = 100)) +
+  geom_point() +
+  xlab("Haridustee pikkus (aastat)") +
+  ylab("Naiste osakaal") +
+  labs(colour = "Klastrid") +
+  guides(size = FALSE)
+```
+
+Jooniselt n?eme, et need klastrid, kus keskmine rahulolu oli enamikus dimensioonides k?rgem, on ka haridustee keskmiselt pikem, ?hes neist klastritest on ka naiste osakaal m?nev?rra k?rgem. Need infokillud v?ivad aidata meil m?testada sisulisemalt, mis on klastritevahelised erinevused ja mis v?ib erisuguste indiviidide eri klastritesse  paigutumise taga olla. Kui anal??siksime samamoodi nt oma ettev?tte kliendibaasi, aitaks see meil oma klientuuri,selle struktuuri ja erip?rasid paremini m?ista.
+
+K?ik eelnev on lihtsuse m?ttes l?bi tehtud ilma andmeid kaalumata. Andmete kaalumine võib klasterstruktuuri mõnevõrra muuta, kuid ei pruugi (märkimisväärselt) - kuna klasteranalüüs põhineb indiviididevahelistel kaugustel, ei mängi kaalumine niivõrd suurt rolli kui näiteks sagedusjaotuste arvutamisel. Kaalutud andmetega saab k-keskmiste klasterdust teha k?suga kmeans.weight paketis SWKM, mida saab ainult GitHubi kaudu laadida. See ei pruugi alati t??tada, sest vajab t??tamiseks ka paketti Rtools, mille peab eraldi installeerima. V?ib siiski proovida SWKM'i ilma eraldi Rtoolsi alla laadimata; v?imalik, et vahepeal pakutakse v?imalust erinevaid pakette uuendada/installeerida, sel juhul tuleks valida valik 4 (RccpArmadillo).
+
+
+```{r}
+install.packages("remotes")
+library(remotes)
+remotes::install_github("Van1yu3/SWKM")
+library(SWKM)
+```
+
+Kui R ?tleb eelviimase k?su peale
+Skipping install of 'SWKM' from a github remote, the SHA1 (b8763db3) has not changed since last install.
+Use `force = TRUE` to force installation
+siis v?ib proovida veel
+
+
+```{r}
+remotes::install_github("Van1yu3/SWKM", force = T)
+library(SWKM)
+```
+
+Teeme eelnevalt tehtud klasterduse n?ite rahulolu tunnuste ja kolme klastriga l?bi n??d ka kaalutud andmetega, enne tuleb andmestik muuta maatriksiks nagu kmeans.weight n?uab. 
+
+```{r}
+stf_f <- as.matrix(stf_f)
+stf_km3_w <- kmeans.weight(stf_f[, 2:7], K = 3, weight = stf_f[, 10], nstart = 25)
+```
+
+Siin on v?rdluseks ka eelnevalt tehtud klasterdus kaaludeta
+
+```{r}
+stf_km3 <- kmeans(stf_f[, 2:7], centers = 3, iter.max = 30, nstart = 25)
+```
+
+
+V?rdleme tulemusi
+
+```{r}
+stf_f <- as.data.frame(stf_f)
+stf_f$clust <- stf_km3$cluster
+stf_f$clustwt <- as.integer(stf_km3_w$cluster)
+```
+
+Kuiv?rd erinevad tulemused saime? Klastrite j?rjekorranumbrid ei m?ngi siinkohal rolli, oluline on, kas klastrite l?ikes moodustub sarnane struktuur (st tulemused on sarnased, kui l?viosa indiviididest on allolevas risttabelisainult kolmes grupis ?heksast v?imalikust).
+
+```{r}
+table(stf_f$clust, stf_f$clustwt)
+```
+
+M?ned harjutused 
+
+Uurige, kuidas on moodustatud klastrid seotud elukohaga. Elukoht on Euroopa Sotsiaaluuringu andmestikus talletatud ainult NUTS3 tasandil, st terve Eesti peale on viis regiooni, vt https://www.stat.ee/296046. Kas m?nes  regioonis on mingi klastri esindajaid rohkem v?i v?hem? Milliseid m?tteid see tekitab rahulolumustrite geograafiliste v?i etniliste ise?rasuste kohta?
+
+Klasterduse aluseks olevaid tunnuseid me eelnevalt ei standardiseerinud. Proovige see ise ?rateha. Tehke standardiseeritud tunnustega klasterdus uuesti ja uurige, kas tulemus muutus kuidagi. Standardiseerimiseks (z-skooride arvutamiseks) saab kasutada funktsiooni scale, sama k?suga mitme tunnuse standardiseerimiseks on abi funktsioonist apply.

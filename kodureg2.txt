@@ -1,0 +1,64 @@
+
+Binomiaalne regressioon
+=============================================
+                      Dependent variable:    
+                  ---------------------------
+                          Netikasutus        
+---------------------------------------------
+Vanus                      -0.063***         
+                            (0.006)          
+                                             
+gndrNaine                  -1.306***         
+                            (0.324)          
+                                             
+HaridusKutse                 0.262           
+                            (0.196)          
+                                             
+HaridusKesk                0.766***          
+                            (0.212)          
+                                             
+HaridusKõrg                1.246***          
+                            (0.196)          
+                                             
+agea:gndrNaine             0.029***          
+                            (0.007)          
+                                             
+Constant                   1.908***          
+                            (0.256)          
+                                             
+---------------------------------------------
+Observations                 1,394           
+Log Likelihood             -875.494          
+Akaike Inf. Crit.          1,764.988         
+=============================================
+Note:             *p<0.1; **p<0.05; ***p<0.01
+
+Binomiaalne regressioon
+=====
+Naine
+-----
+
+Binomiaalne regressioon
+============
+Kutseharidus
+------------
+
+Binomiaalne regressioon
+===========
+Keskharidus
+-----------
+
+Binomiaalne regressioon
+===========
+Kõrgharidus
+-----------
+
+Binomiaalne regressioon
+============
+Vanus* Naine
+------------
+
+Binomiaalne regressioon
+=========
+Vabaliige
+---------
