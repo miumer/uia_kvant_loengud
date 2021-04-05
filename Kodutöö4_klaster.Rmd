@@ -1,0 +1,261 @@
+---
+title: "Klasteanalüüsi kodutöö"
+author: "Siim"
+date: "4/4/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r}
+library(essurvey)
+library(tidyverse)
+library(pheatmap)
+library(ggplot2)
+library(RColorBrewer)
+library(rnaturalearth)
+library(sf)
+```
+
+```{r}
+set_email("siimpoldre@gmail.com") 
+eu9 <- import_rounds(9, format="spss")
+
+eu9 <- eu9 %>% 
+  select(cntry, freehms, hmsfmlsh, hmsacld, pspwght)
+
+#Teeme võrdleva ploti toorestest vastustest
+cntry_raw_plt <- eu9 %>% 
+  pivot_longer(cols = c("freehms", "hmsfmlsh", "hmsacld"), names_to = "Question", values_to = "Answer") %>% 
+  ggplot(aes(x=cntry, fill = as.factor(Answer))) + 
+  geom_bar(position="fill") +
+  coord_flip()+
+  xlab("Riik")+
+  ylab("Osakaal")+
+  scale_fill_manual(name = "Vastus", 
+                      labels = c("1-Agree strongly", "2-Agree", "3-Neither agree nor disagree", "4-Disagree", "5-Disagree strongly"),
+                      values = c("darkgreen", "lightgreen", "#F7F7F7", "#CC99FF", "#8E0152"),
+                      na.value = "gray20")+
+  
+  facet_wrap(~Question, labeller = labeller(Question = c(`freehms`="Gays and lesbians free \n to live life as they wish",
+                                                         `hmsfmlsh`="Ashamed if close family \n member gay or lesbian",
+                                                         `hmsacld`="Gay and lesbian couples right \n to adopt children")))+
+  theme(strip.text.x = element_text( size = 6, color = "black", face = "bold.italic"))+
+  theme(axis.text.x = element_text(angle = 45))
+
+ggsave("agg_cluster_plot2.png", cntry_raw_plt, device = "png", height = 12, width = 20, units = c("cm"))
+
+#Võtame kaalutud keskmise
+eu9_agg <- eu9 %>% 
+  group_by(cntry) %>% 
+  summarise(freehms_mean = weighted.mean(as.numeric(freehms), na.rm=T, w = pspwght),
+            hmsfmlsh_mean = weighted.mean(as.numeric(hmsfmlsh), na.rm=T, w = pspwght),
+            hmsacld_mean = weighted.mean(as.numeric(hmsacld), na.rm=T, w = pspwght))
+
+eu9_agg_scaled <-eu9_agg %>% 
+  mutate(freehms_mean = scale(freehms_mean),
+         hmsfmlsh_mean = scale(hmsfmlsh_mean),
+         hmsacld_mean = scale(hmsacld_mean)) 
+
+cbind(eu9_agg, eu9_agg_scaled)
+```
+
+```{r}
+#Plot keskmistest
+agg_plot <-eu9_agg %>%
+  pivot_longer(cols = c("freehms_mean", "hmsfmlsh_mean", "hmsacld_mean"), names_to = "Question", values_to = "Mean score") %>% 
+  ggplot(aes(x=cntry, y = `Mean score`, color = Question, group = Question)) + 
+  geom_point()+
+  geom_line()+
+  xlab("Riik")+
+  ylab("Keskmine skoor")+
+  scale_color_brewer(name = "Küsimus", 
+                      labels = c("Gays and lesbians free \n to live life as they wish", 
+                                 "Ashamed if close family \n member gay or lesbian", 
+                                 "Gay and lesbian couples right \n to adopt children"),
+                      palette="Dark2")+
+  theme(legend.position = "top") +
+  annotate("text", x = 1, y = 4.8, 
+           label = "Keskmine põhineb skaalal: \n 1 - Agree Strongly \n 5 - Disagree strongly",
+           hjust = 0)
+
+ggsave("agg_cluster_plot_1.png", agg_plot, device = "png", height = 9, width = 10)
+```
+  
+```{r}
+eu9_agg_rows <- eu9_agg$cntry
+eu9_agg_rows
+
+agg_mat <- eu9_agg %>% 
+  select(freehms_mean, hmsfmlsh_mean, hmsacld_mean) %>% 
+  as.matrix()
+
+eu9_rows <- data.frame(Question = factor(c("Gays and lesbians free to live life as they wish", 
+                                 "Ashamed if close family member gay or lesbian", 
+                                 "Gay and lesbian couples right to adopt children")))
+rownames(eu9_rows) <- colnames(agg_mat)
+
+rownames(agg_mat) <- eu9_agg_rows
+
+d_agg <- stats::dist(agg_mat)
+
+d_agg_comp <- hclust(d_agg, method = "complete")
+
+clusters <- as.data.frame(cutree(d_agg_comp, 4)) %>% 
+  rownames_to_column() %>% 
+  rename(iso_a2 = rowname, cluster = `cutree(d_agg_comp, 4)`) 
+
+col_anns <- as.data.frame(cutree(d_agg_comp, 4)) %>% 
+    rename(Cluster = `cutree(d_agg_comp, 4)`) %>% 
+  mutate(Cluster = as.character(Cluster))
+```
+
+```{r}
+#Kõige paremini klasterdas complete, sest teised küll andsid ka selgelt kaks erinevat klastrit, aga vähem selgelt olid eristatavad 4 tk.
+comp_heat <- pheatmap(t(agg_mat),
+         main = "ESS heatmap",
+         show_rownames = F,
+         show_colnames = T,
+         cluster_rows = F,
+         clustering_distance_col = "euclidean", 
+         clustering_method = "complete",
+         angle_col = 45,
+         fontsize_number = 7,
+         number_color = "black",
+         cutree_cols = 4,
+         cellheight = 35,
+         cellwidth = 16,
+         annotation_row = eu9_rows,
+         annotation_col = col_anns,
+         legend_breaks = c(-2, 4.5),
+         legend_labels = c("Agree strongly","Disagree strongly"),
+         color = colorRampPalette(c("darkgreen", "#F7F7F7", "#8E0152"))(99),
+         annotation_colors = list(Question = c(`Gays and lesbians free to live life as they wish` = "#1B9E77", 
+                                        `Ashamed if close family member gay or lesbian` = "#D95F02", 
+                                        `Gay and lesbian couples right to adopt children` = "#7570B3"),
+                                  Cluster = c(`1` = "#E31A1C",
+                                              `2` = "#6A3D9A",
+                                              `3` = "#CAB2D6",
+                                              `4` = "#FB9A99")),
+         filename = "Ess_heat1_2.png",
+         height = 9,
+         width = 15.5)
+
+pheatmap(t(agg_mat),
+         main = "ESS heatmap",
+         show_rownames = F,
+         show_colnames = T,
+         cluster_rows = F,
+         clustering_distance_col = "euclidean", 
+         clustering_method = "single",
+         angle_col = 45,
+         display_numbers = T,
+         fontsize_number = 7,
+         number_color = "black",
+         cutree_cols = 2,
+         cellheight = 35,
+         cellwidth = 16,
+         annotation_row = eu9_rows,
+         legend_breaks = c(1.5, 4.5),
+         legend_labels = c("Agree strongly","Disagree strongly"),
+         color = colorRampPalette(c("darkgreen", "#F7F7F7", "#8E0152"))(99),
+         filename = "Ess_heat2_2.png",
+         height = 9,
+         width = 15.5)
+
+pheatmap(t(agg_mat),
+         main = "ESS heatmap",
+         show_rownames = F,
+         show_colnames = T,
+         cluster_rows = F,
+         clustering_distance_col = "euclidean", 
+         clustering_method = "ward.D2",
+         angle_col = 45,
+         display_numbers = T,
+         fontsize_number = 7,
+         number_color = "black",
+         cutree_cols = 4,
+         cellheight = 35,
+         cellwidth = 16,
+         annotation_row = eu9_rows,
+         annotation_col = col_anns,
+         legend_breaks = c(1.5, 4.5),
+         legend_labels = c("Agree strongly","Disagree strongly"),
+         color = colorRampPalette(c("darkgreen", "#F7F7F7", "#8E0152"))(99),
+         annotation_colors = list(Question = c(`Gays and lesbians free to live life as they wish` = "#1B9E77", 
+                                        `Ashamed if close family member gay or lesbian` = "#D95F02", 
+                                        `Gay and lesbian couples right to adopt children` = "#7570B3"),
+                                  Cluster = c(`1` = "#E31A1C",
+                                              `2` = "#6A3D9A",
+                                              `3` = "#CAB2D6",
+                                              `4` = "#FB9A99")),
+          filename = "Ess_heat3_2.png",
+          height = 9,
+          width = 15.5)
+
+pheatmap(t(agg_mat),
+         main = "ESS heatmap",
+         show_rownames = F,
+         show_colnames = T,
+         cluster_rows = F,
+         clustering_distance_col = "euclidean", 
+         clustering_method = "average",
+         angle_col = 45,
+         display_numbers = T,
+         fontsize_number = 7,
+         number_color = "black",
+         cutree_cols = 2,
+         cellheight = 35,
+         cellwidth = 16,
+         legend_breaks = c(1.5, 4.5),
+         legend_labels = c("Agree strongly","Disagree strongly"),
+         annotation_row = eu9_rows,
+         color = colorRampPalette(c("darkgreen", "#F7F7F7", "#8E0152"))(99),
+         annotation_colors = list(Question = c(`Gays and lesbians free to live life as they wish` = "#1B9E77", 
+                                        `Ashamed if close family member gay or lesbian` = "#D95F02", 
+                                        `Gay and lesbian couples right to adopt children` = "#7570B3")),
+         filename = "Ess_heat4_2.png",
+         height = 9,
+         width = 15.5)
+```
+
+
+```{r}
+europeanUnion <- c("Austria","Belgium","Bulgaria","Croatia","Cyprus",
+                   "Czech Rep.","Denmark","Estonia","Finland","France",
+                   "Germany","Greece","Hungary","Ireland","Italy","Latvia",
+                   "Lithuania","Luxembourg","Malta","Netherlands","Poland",
+                   "Portugal","Romania","Slovakia","Slovenia","Spain",
+                   "Sweden")
+
+world_map <- ne_countries(scale = 50, returnclass = 'sf')
+europe_map <- world_map %>% filter(name %in% europeanUnion)
+
+europe_bbox <- st_bbox(c(xmin = -12, xmax = 34, ymax = 71, ymin = 34), crs = st_crs(4326))
+
+europe_map <- europe_map %>% 
+  st_crop(europe_bbox)
+
+cluster_map <- europe_map %>% 
+  right_join(clusters) %>%
+  mutate(cluster = as.factor(cluster)) %>% 
+  ggplot() +
+    geom_sf(aes(fill = factor(cluster))) + 
+    theme_void()+
+  scale_fill_manual(values = c("#E31A1C", "#6A3D9A", "#CAB2D6", "#FB9A99"), name = "Cluster")
+
+cluster_map2 <- europe_map %>% 
+  right_join(clusters) %>%
+  mutate(cluster = as.factor(cluster)) %>% 
+  ggplot() +
+    geom_sf(aes(fill = factor(cluster))) + 
+    theme_void()+
+  scale_fill_manual(values = c("#E31A1C", "#6A3D9A", "#CAB2D6", "#FB9A99"), name = "Cluster")
+  
+cluster_map
+ggsave("cluster_map2.png", cluster_map)
+```
+

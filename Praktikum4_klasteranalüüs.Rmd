@@ -109,7 +109,7 @@ library(descr)
 freq(round(dist(plt[1:15,], method = "binary"), 2))
 ```
 
-Hierarhiline klasteranalüüs ####
+### Hierarhiline klasteranalüüs
 
 Teeme harjutuseks läbi Toodingu raamatus olevad näited ja vaatame, kuidas vastavad klasterdused näevad välja liigituspuul.
 
@@ -157,7 +157,6 @@ plot(d_average)
 
 Wardi meetod
 
-
 ```{r}
 d_ward <- hclust(d, method = "ward.D2")
 plot(d_ward)
@@ -203,7 +202,7 @@ plot(scaled_ward)
 
 3) Jätkame Euroopa andmetega. Kas klasterdus andis õieti midagi juurde juba koostatud indeksile? Mille alusel saaks seda hinnata? 
 
-Kui vaatame klastreid, ja indeksi väärtuseid,siis saame vaadata,kas klasterdus ühtib indeksiga. Kui riigid, mis peaksid indeksi järgi olema sarnased, pole ühes klastris, siis pole indeks väga hea kirjeldus. Selleks tuleks vaadata klastrite sisu ja seda, mis on indeksiskoor. 
+Kui vaatame klastreid, ja indeksi väärtuseid,siis saame vaadata, kas klasterdus ühtib indeksiga. Kui riigid, mis peaksid indeksi järgi olema sarnased, pole ühes klastris, siis pole indeks väga hea kirjeldus. Selleks tuleks vaadata klastrite sisu ja seda, mis on indeksiskoor. 
 
 4) Jagades riigid viiese klasterduse alusel, uurige lähemalt gruppi, kuhu kuulub Eesti, st uurige 12 tunnuse väärtusi nende riikide lõikes. Mille poolest sarnaneb Eesti enamikule riikidele kõige rohkem? Kus on suurimad erinevused? 
 
@@ -241,7 +240,6 @@ plot(d_average, cex = 0.5)
 
 d_ward <- hclust(d, method = "ward.D2")
 plot(d_ward, cex = 0.5)
-
 
 
 econ2$ward4 <- cutree(d_ward, 4)
@@ -286,7 +284,6 @@ ggplot(econ_eur_ward5_grest, aes(x = Country.Name, y = Property.Rights)) +
   xlab("Klastrid") +
   ylab("Rahulolu keskmine") + 
   labs(fill = "Rahulolu")
-
 ```
 
 
