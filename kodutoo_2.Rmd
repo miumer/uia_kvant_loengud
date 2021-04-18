@@ -1,0 +1,79 @@
+---
+title: "Kodutöö 2"
+author: "Siim"
+date: "3/2/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(essurvey)
+library(GGally)
+library(psych)
+library(ggpubr)
+library(ggplot2)
+library(TAM)
+library(forcats)
+library(olsrr)
+library(car)
+library(xlsx)
+library(broom)
+library(stargazer)
+```
+
+```{r}
+set_email("siimpoldre@gmail.com")
+
+
+essee18 <-
+  import_country(
+    country = "Estonia",
+    rounds = c(9)
+  )
+```
+
+Kas rahulolu demokraatia toimimisega Eestis (stfdem, küsimus B30 ankeedis lk 9) 2018. aastal on seotud sellega, kas osaleti viimastel valimistel (vote, küsimus B13 ankeedis lk 6), kas kuulutakse rahvusvähemusse (blgetmg, küsimus C26 ankeedis lk 21), kui vana ollakse (agea) ja kas ollakse mees või naine (gndr, küsimus F2 ankeedis lk 42)? Palun kasutage Euroopa Sotsiaaluuringu Eesti 2018. aasta andmeid!
+
+Palun kirjutage välja regressioonivõrrand ja palun kirjutage iga koefitsiendi korral välja, mida see tähendab, samuti see, kui palju sõltumatud tunnused kirjeldavad ära sõltuva tunnuse hajuvusest! Palun postitage moodle foorumisse oma mudel (summary tabel), regressioonivõrrand, regressioonikoefitsiantide selgitused ja see kui palju sõltumatud tunnused kirjeldavad ära sõltuva tunnuse hajuvusest.
+
+Jätame välja NAdega inimesed (65 inimest). 
+
+```{r}
+dat <- essee18 %>% 
+  select(stfdem, vote, blgetmg, agea, gndr,pspwght) %>% 
+  na.omit() %>%
+  mutate(stfdem = as.numeric(stfdem))
+```
+
+```{r}
+indmudel <- lm(stfdem ~ vote + blgetmg + agea + gndr, data=dat, weights=pspwght)
+indmudel
+summary(indmudel)
+
+stargazer(indmudel, type="text", dep.var.labels="Usk demokraatia toimimisse", 
+          covariate.labels=c("Ei käinud hääletamas", "Ei saanud hääletada", "Vähemusrahvus", "Vanus", "Sugu", "Vabaliige"), out="indeks_reg2.txt")
+```
+
+Regressioonivõrrand: stfdem = 6.602 - 0.987voteNo + 0.249vote_Not_eligible_to_vote + 0.614blgetmgNo - 0.013age + 0.087gndr.
+
+Vabaliige 6.602 näitab üleval olevas võrrandis, et kui kõik ennustavad tunnused (valimistel osalemine, rahvusvähemusse kuulumine, vanus, sugu) on tasemel 0 (võib olla ka baastase kategoorilise tunnuse puhul), siis on rahulolu demokraatia toimimisega Eestis 6.602. See ei ole tegelikkuses reaalsuses tõlgendatav, sest vanuse 0 olemine ei ole võimalik.
+
+Teine koefitsent -0.987 näitab, et, et nende inimeste, kes ei käinud eelmisel korral hääletamas, usk demokraatiasse on keskmiselt 0.987 punkti võrra madalam kui nende inimeste usk demokraatiasse, kes käisid hääletamas.
+
+Kolmas koefitsent 0.249 näitab, et nende inimeste, kes ei saanud hääletada, usk demokraatiasse on keskmiselt 0.249 punkti võrra kõrgem kui nende, kes käisid hääletamas
+
+Neljas koefitsent näitab, et nende inimeste, kes ei kuulu rahvusvähemusse, usk demokraatiasse on keskmiselt 0.614 võrra kõrgem, kui nende, kes kuuluvad rahvusvähemusse. 
+
+Viies koefitsent näitab, et vanuse muutudes ühe aasta võrra kõrgemaks, muutub usk demokraatiasse keskmiselt 0.013 punkti võrra madalamaks. 
+
+Kuues koefitsent näitab, et naiste usku demokraatiasse on keskmiselt 0.087 võrra suurem kui meeste usk demokraatiasse.
+
+Sõltumatud tunnused kirjeldavad sõltuva tunnuse (usk deomkraatiasse) hajuvusest ära kuskil 5.1%. Kphandatud Ri järgi 0.048.
+
+
+
+

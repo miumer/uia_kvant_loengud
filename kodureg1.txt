@@ -1,0 +1,66 @@
+
+Lineaarne regressioon
+===============================================
+                        Dependent variable:    
+                    ---------------------------
+                       Netikasutus minutites   
+-----------------------------------------------
+Vanus                        -0.163***         
+                              (0.014)          
+                                               
+gndrNaine                    -2.518***         
+                              (0.790)          
+                                               
+HaridusKutse                 1.385***          
+                              (0.500)          
+                                               
+HaridusKesk                  2.813***          
+                              (0.537)          
+                                               
+HaridusKõrg                  4.615***          
+                              (0.490)          
+                                               
+agea:gndrNaine               0.056***          
+                              (0.017)          
+                                               
+Constant                     19.041***         
+                              (0.611)          
+                                               
+-----------------------------------------------
+Observations                   1,394           
+R2                             0.164           
+Adjusted R2                    0.160           
+Residual Std. Error      5.459 (df = 1387)     
+F Statistic          45.299*** (df = 6; 1387)  
+===============================================
+Note:               *p<0.1; **p<0.05; ***p<0.01
+
+Lineaarne regressioon
+=====
+Naine
+-----
+
+Lineaarne regressioon
+============
+Kutseharidus
+------------
+
+Lineaarne regressioon
+===========
+Keskharidus
+-----------
+
+Lineaarne regressioon
+===========
+Kõrgharidus
+-----------
+
+Lineaarne regressioon
+============
+Vanus* Naine
+------------
+
+Lineaarne regressioon
+=========
+Vabaliige
+---------

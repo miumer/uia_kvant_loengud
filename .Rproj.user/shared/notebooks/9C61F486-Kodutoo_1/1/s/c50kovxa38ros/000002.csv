@@ -1,8 +1,0 @@
-"0","andmed2 %>% "
-"0","  filter(!is.na(rlgdgr)) %>% "
-"0","  mutate(rlgdgr2 = recode(rlgdgr, `Not at all religious` = 0, `Very religious` = 10, `1` = 1,"
-"0","                          `2` = 2, `3` = 3, `4` = 4, `5` = 5, `6` = 6, `7` = 7, `8` = 8, `9` = 9)) %>% "
-"0","  group_by(valiidne) %>% "
-"0","  summarise(keskm_religioossus = mean(rlgdgr2)) %>% "
-"0","  kbl() %>% "
-"0","  kable_classic"

@@ -1,4 +1,0 @@
-"0","ee9 <- read_csv(""data.csv"")
-"
-"2","Error: 'data.csv' does not exist in current working directory ('/Users/siimpoldre/Documents/r_projects/uia_kvant_loengud').
-"

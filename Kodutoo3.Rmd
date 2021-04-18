@@ -1,0 +1,162 @@
+---
+title: "Mitte-lineaarne regressioon"
+author: "Siim"
+date: "3/21/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+```{r}
+library(TAM)
+library(ggpubr)
+library(ggplot2)
+library(forcats)
+library(olsrr)
+library(essurvey)
+library(tidyverse)
+library(matrixStats)
+library(reldist)
+library(DescTools)
+library(lmtest)
+library(stargazer)
+library(VGAM)
+library(nnet)
+```
+Andmete allalaadimine
+```{r}
+set_email("siimpoldre@gmail.com")
+
+
+essee18 <-
+  import_country(
+    country = "Estonia",
+    rounds = c(9),
+    format="spss"
+  )
+```
+
+Andmete setup
+```{r}
+netidf <- essee18 %>% 
+  dplyr::select(netustm, agea, edulvlb, gndr, pspwght) 
+
+netidf$Haridus <- car::recode(as.numeric((essee18$edulvlb)), "0:213='Kuni_põhi'; 229='Kutse'; 313='Kesk'; 321:423='Kutse'; 520:800='Kõrg'; 5555=NA")
+netidf$Haridus <- factor(netidf$Haridus, levels=c("Kuni_põhi", "Kutse", "Kesk", "Kõrg", NA))
+
+weightedMedian(essee18$netustm, w=netidf$pspwght, na.rm=TRUE)
+
+netidf$netbin [netidf$netustm <= 180] <- c("Alla_keskmise")
+netidf$netbin [netidf$netustm > 180] <- c("Üle_keskmise")
+netidf$netbin [is.na(netidf$netustm)] <- NA
+
+netidf$netbin <- factor(netidf$netbin, levels = c("Alla_keskmise", "Üle_keskmise"))
+
+wtd.quantile(essee18$netustm, q=c(0.25,0.5,0.75), na.rm = FALSE, weight=netidf$pspwght)
+
+netidf$netmult [essee18$netustm <= 120] <- c("Madal")
+netidf$netmult [essee18$netustm <= 180 & essee18$netustm > 120] <- c("Madal-keskmine")
+netidf$netmult [essee18$netustm <= 360 & essee18$netustm > 180] <- c("Kõrge-keskmine")
+netidf$netmult [essee18$netustm > 360] <- c("Kõrge")
+netidf$netmult [is.na(netidf$netustm)] <- NA
+netidf$netmult <- factor(netidf$netmult, levels = c("Madal", "Madal-keskmine", "Kõrge-keskmine", "Kõrge"))
+
+netidf$gndr <- car::recode(as.numeric(netidf$gndr), "1='Mees'; 2='Naine'")
+
+#remove NA-s and 1s 
+netidf <- netidf %>% 
+  filter(netustm != 1)
+
+
+levels(netidf$netbin) 
+```
+
+Vaatame sõltuva muutuja eeldustele vastavust lineaarse regressiooni jaoks
+```{r}
+hist(sqrt(netidf$netustm))
+weighted_skewness(sqrt(netidf$netustm), essee18$pspwght)
+weighted_skewness(log(netidf$netustm), essee18$pspwght)
+weighted_skewness(netidf$netustm, essee18$pspwght)
+
+ggqqplot(sqrt(netidf$netustm), weights= netidf$pspwght)
+ggqqplot(log(netidf$netustm), weights = netidf$pspwght)
+ggqqplot(netidf$netustm, weights = netidf$pspwght)
+
+shapiro.test(log(netidf$netustm))
+```
+
+Ruutjuur sõltuvast vastab kõige paremini eeldustele
+```{r}
+netidf$juurnet <- sqrt(netidf$netustm)
+```
+
+```{r}
+mudel <- lm(juurnet ~ agea + gndr + Haridus + agea*gndr,  data=netidf, weights=pspwght)
+summary(mudel)
+```
+
+Tundub, et residualid on ka enamvähem korras
+```{r}
+par(mfrow=c(2,2))
+plot(mudel)
+par(mfrow=c(1,1))
+plot(mudel, 4)
+```
+
+Tolerance ja VIF on vist korras (tolerance peaks üle 0.2 olema ja VIF alla 4 või äärmisel juhul alla 5). Interaktsiooni kovariatsioon on muidugi kõrge.
+```{r}
+ols_vif_tol(mudel)
+```
+
+Tõepärasuhte test näitab, et ühe interaktsiooniga mudel on kõige parem
+```{r}
+netidf$gndr <- factor(netidf$gndr, levels = c("Mees", "Naine"))
+
+mudel_bilog <- glm(netbin ~ agea + gndr + Haridus + agea*gndr, family=binomial(link="logit"), data=netidf, weights=pspwght)
+
+summary(mudel_bilog)
+
+PseudoR2(mudel_bilog, which=c("Nagelkerke", "CoxSnell", "McFadden"))
+
+exp(coefficients(summary(mudel_bilog)))
+```
+
+```{r}
+mudel_multilog <- multinom(netmult ~ agea + gndr + Haridus + agea*gndr, weights=pspwght, data=netidf, model = TRUE)
+
+summary(mudel_multilog)
+
+PseudoR2(mudel_multilog, which=c("Nagelkerke", "CoxSnell", "McFadden"))
+
+exp(coef(mudel_multilog))
+
+stargazer(mudel_multilog, type="text", dep.var.labels=c("II", "III", "IV"), 
+          covariate.labels=c("Vanus", "Naine", "Kutse", "Kesk", "Kõrg", "Vanus*Naine", "Vabaliige"),
+          out="siss4.txt")
+```
+
+```{r}
+netidf$netmultord <- as.numeric(netidf$netmult)
+
+mudel_ordreg2 <- vglm(netmultord ~ agea + gndr + Haridus + agea*gndr, family = cumulative(parallel = TRUE), weights=pspwght, data = netidf, model = TRUE)
+summary(mudel_ordreg2)
+```
+
+```{r}
+PseudoR2(mudel_bilog, which=c("Nagelkerke", "CoxSnell", "McFadden"))
+PseudoR2(mudel_multilog, which=c("Nagelkerke", "CoxSnell", "McFadden"))
+PseudoR2(mudel_ordreg2, which=c("Nagelkerke", "CoxSnell", "McFadden") )
+```
+
+```{r results = 'asis'}
+stargazer(mudel, type = "text", dep.var.labels="Netikasutus minutites", covariate.labels = "Vanus", "Naine", "Kutseharidus", "Keskharidus", "Kõrgharidus", "Vanus*Naine", "Vabaliige", title = "Lineaarne regressioon", out="kodureg1.txt") 
+
+stargazer(mudel_bilog, type = "text", dep.var.labels="Netikasutus", covariate.labels = "Vanus", "Naine", "Kutseharidus", "Keskharidus", "Kõrgharidus", "Vanus*Naine", "Vabaliige", title = "Binomiaalne regressioon", out="kodureg2.txt")
+
+stargazer(mudel_multilog, type="text", dep.var.labels=c("Madalam-keskmine", "Kõrgem-keskmine", "Kõrge"), covariate.labels=c("Vanus", "Naine", "Kutse", "Kesk", "Kõrg", "Vanus*Naine", "Vabaliige"), title = "Multinomiaalne logistiline regressioon", out="kodureg3.txt")
+```
+
