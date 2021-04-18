@@ -83,7 +83,7 @@ summary(fit2)
 plot(fit2, conf.int = T, mark.time = T)
 ```
 
-lisame tsenseeritud indiviidid
+lisame tsenseeritud indiviidid. Tsenseeritud indiviidide puhul saab nende vanuseks "esimese lapse saamise ala" nende vanus küstiluse lõppemise hetkel. See on loogiline sellepärast, et uurime elulemusfunktsiooniga seda, kui suur tõenäosus on mitte lapsi saada igas vanuses ja saame nende inimeste puhul kindlalt öelda, et nad pole küsitluse lõppemise hetkeks lapsi saanud, seega on nende lapse saamise vanuse vähemalt see, mis nad küsitluse lõppetmise hetkel on.
 
 ```{r}
 ee9$fcldage2 <- ee9$fcldage
@@ -98,7 +98,7 @@ summary(fit3)
 plot(fit3, conf.int = T, mark.time = F, xlim = c(0,51))
 ```
 
-jätame välja indiviidid, kelle puhul võiks olla kindel, et nad lapsi enam ei saa
+jätame välja indiviidid, kelle puhul võiks olla kindel, et nad lapsi enam ei saa, sest neid ei tohiks arvestada, et nad üldse lapse saavad, isegi hiljem ja seega nad ei peaks osalema elulemusfunktsioonis.
 
 ```{r}
 

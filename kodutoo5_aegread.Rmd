@@ -9,22 +9,123 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-## R Markdown
+Analüüsige Kaplan-Meieri elukestuskõverate põhjal, kas esimese lapse saamise vanus varieerub rahvusvähemusgruppi kuulumise ja vanemate ametite lõikes. Lisaks, täiendades loengus koostatud mudelit, uurige, kas nimetatud tunnused prognoosivad lapse saamise n-ö riski, koostage ka mudeli alusel saadud elukestuskõverad. Vanemate ametite tunnustes tuleb kategooriaid kokku kodeerida, ilmselt võib olla mõttekas kaasata mudelisse ainult ühe vanema ameti tunnus või ametite hierarhias kõrgemalseisva ametiga vanema amet. Uurige ka võrdeliste riskide eelduse täidetust (hinnang võib olla subjektiivne, aga proovige).
 
-This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+http://www.europeansocialsurvey.org/docs/round9/fieldwork/source/ESS9_source_questionnaires.pdf
 
-When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+https://www.europeansocialsurvey.org/docs/round9/survey/ESS9_data_protocol_e01_4.pdf
 
-```{r cars}
-summary(cars)
+```{r}
+library("tidyverse")
+library(weights)
+library(descr)
+library(essurvey)
+library(survminer)
 ```
 
-## Including Plots
 
-You can also embed plots, for example:
+```{r}
+set_email("siimpoldre@gmail.com")
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+ee9 <- import_country(country = "Estonia", rounds = 9, format= "spss")
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+survival <- ee9 %>% 
+  select(fcldbrn, blgetmg, occf14b, bthcld, occm14b, agea, pspwght, yrbrn)
+```
+
+
+```{r}
+survival$bthcld01 <- as.numeric(survival$bthcld)
+#Peame tegema 0-1 tunnuse, sest järjekord peaks olema, et No on 0, aga siin on 1.
+survival$bthcld01[survival$bthcld01 == 2] <- 0
+
+survival$fcldage <- survival$fcldbrn - survival$yrbrn
+```
+
+Simplest model
+```{r}
+fit <- survfit(Surv(fcldage, bthcld01) ~ 1, data = survival, weights = pspwght)
+summary(fit)
+
+plot(fit, conf.int = T, mark.time = T)
+```
+
+Tsenseeritud indiviidide lisamine. Tsenseeritud indiviidide puhul saab nende vanuseks "esimese lapse saamise ala" nende vanus küstiluse lõppemise hetkel. See on loogiline sellepärast, et uurime elulemusfunktsiooniga seda, kui suur tõenäosus on mitte lapsi saada igas vanuses ja saame nende inimeste puhul kindlalt öelda, et nad pole küsitluse lõppemise hetkeks lapsi saanud, seega on nende lapse saamise vanuse vähemalt see, mis nad küsitluse lõppetmise hetkel on.
+```{r}
+survival$fcldage2 <- survival$fcldage
+
+survival$fcldage2[survival$bthcld01 == 0] <- survival$agea[survival$bthcld01 == 0]
+```
+
+Tsenseeritud indiviididega mudel. 
+```{r}
+fit2 <- survfit(Surv(fcldage2, bthcld01) ~ 1, data = survival, weights = pspwght)
+summary(fit2)
+
+plot(fit, conf.int = T, mark.time = T)
+plot(fit2, conf.int = T, mark.time = F, xlim = c(0,51))
+```
+
+Jätame välja need, kes üle 41 aaastased ja pole ühtegi saanud, sest nad ilmselt ei saa ka enam
+```{r}
+surv_51 <- survival[survival$agea <= 41 | survival$bthcld01 == 1,]
+```
+
+
+```{r}
+fit3 <- survfit(Surv(fcldage2, bthcld01) ~ 1, data = surv_51, weights = pspwght)
+summary(fit3)
+
+plot(fit3, conf.int = T, mark.time = F, xlim = c(0,51))
+```
+
+```{r}
+surv_51$blgetmg2 <- as.numeric(surv_51$blgetmg)
+surv_51$blgetmg2[surv_51$blgetmg2 == 2] <- 0
+
+
+surv_51 <- surv_51 %>% 
+  mutate(occ_best = case_when(
+    as.numeric(surv_51$occf14b) < as.numeric(surv_51$occm14b) ~ surv_51$occf14b,
+    TRUE ~ as.numeric(surv_51$occm14b)
+  ))
+
+surv_51$occf14b
+
+#1-3: Upper and middle class workers; 4-6: Skilled working-class; 7-9: Low-skilled working class.
+surv_51 <- surv_51 %>%
+  mutate(occ_best_num = as.numeric(occ_best)) %>% 
+  mutate(occ_best_num2 = recode(occ_best_num, `2` = 1, `3`=1, `4`=2, `5`=2,`6`=2, `7`=3, `8`=3, `9`=3))
+
+fit_minor <- survfit(Surv(fcldage2, bthcld01) ~ blgetmg2, data = surv_51, weights = pspwght)
+fit_occ <- survfit(Surv(fcldage2, bthcld01) ~ occ_best_num2, data = surv_51, weights = pspwght)
+fit_min_occ <- survfit(Surv(fcldage2, bthcld01) ~ blgetmg2 + occ_best_num2, data = surv_51, weights = pspwght)
+
+summary(fit_minor)
+summary(fit_occ)
+summary(fit_min_occ)
+
+ggsurvplot(fit_minor, data = surv_51, conf.int = TRUE, 
+           censor = F, #meid ei huvita tsenseeritud inimesed 
+           legend.labs = c("Non-minotiry", "Minotiry"), 
+           surv.median.line = "hv", #tahame mediaaniväärtusied ka 
+           ggtheme = theme_minimal())
+
+ggsurvplot(fit_occ, data = surv_51, conf.int = TRUE, 
+           censor = F, #meid ei huvita tsenseeritud inimesed 
+           legend.labs = c("Upper and middle class workers", "Skilled working class", "Low-skilled working class"), 
+           surv.median.line = "hv", #tahame mediaaniväärtusied ka 
+           ggtheme = theme_minimal())
+
+ggsurvplot(fit_min_occ, data = surv_51, conf.int = TRUE, 
+           censor = F, #meid ei huvita tsenseeritud inimesed 
+           legend.labs = c(1:6), 
+           surv.median.line = "hv", #tahame mediaaniväärtusied ka 
+           ggtheme = theme_minimal())
+```
+
+
+
+
