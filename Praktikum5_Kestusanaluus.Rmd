@@ -1,0 +1,244 @@
+---
+title: "Kestusandmed"
+author: "Siim"
+date: "4/9/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+sotsiaalse analüüsi meetodid: kvantitatiivne lähenemine
+sündmusanalüüs
+
+
+```{r}
+install.packages("survival")
+library(survival)
+```
+
+Loengunäide 
+
+teeme harjutuseks läbi loengunäite
+
+```{r}
+andm <- read.csv2("http://www.ut.ee/~indrekso/syndmusanalnaide2.csv")
+andm
+```
+
+Summaryga saame vaadata igal ajahetkel, mil sündmused toimusid, elukestusfunktsiooni hinnanguid koos standardvigadega ja usalduspiiridega.
+```{r}
+fit <- survfit(Surv(aeg, syndmus) ~ 1, data = andm)
+summary(fit)
+```
+
+```{r}
+#Elulemus ilma tsenseeritud inimesi kujutamata
+plot(fit, conf.int = F, mark.time = F)
+
+#Tsenseeritud inimesed ka
+plot(fit, conf.int = F, mark.time = T)
+
+#Usaldusvahemikud ka (laiad, sest meil ainult 0 indiviidi)
+plot(fit, conf.int = T, mark.time = T)
+```
+
+Kaplan-Meier 
+
+kasutame ESS9 andmeid, arvutame elukestuskõverad esimese lapse sünni vanuse kohta. Saame kasutada ainult selliseid andmed, kus on küsitud perioodi algus ja lõpppunkti, sest ESS pole longituuduuring tegelikult.
+
+```{r}
+library(essurvey)
+set_email("siimpoldre@gmail.com")
+
+ee9 <- import_country(country = "Estonia", rounds = 9, format= "spss")
+
+library(weights)
+wtd.hist(ee9$fcldbrn, weight = ee9$pspwght)
+```
+
+arvutame respondendi vanuse esimese lapse sünni ajal
+
+```{r}
+ee9$fcldage <- ee9$fcldbrn - ee9$yrbrn
+
+wtd.hist(ee9$fcldage, weight = ee9$pspwght, breaks = 25, freq = T)
+
+library(descr)
+descr::freq(ee9$fcldage, w = ee9$pspwght)
+
+str(ee9$bthcld)
+attributes(ee9$bthcld)
+ee9$bthcld01 <- ee9$bthcld
+#Peame tegema 0-1 tunnuse, sest järjekord peaks olema, et No on 0, aga siin on 1.
+ee9$bthcld01[ee9$bthcld == 2] <- 0
+
+descr::freq(ee9$bthcld, w = ee9$pspwght)
+descr::freq(ee9$bthcld01, w = ee9$pspwght)
+
+fit2 <- survfit(Surv(fcldage, bthcld01) ~ 1, data = ee9, weights = pspwght)
+summary(fit2)
+
+plot(fit2, conf.int = T, mark.time = T)
+```
+
+lisame tsenseeritud indiviidid
+
+```{r}
+ee9$fcldage2 <- ee9$fcldage
+
+ee9$fcldage2[ee9$bthcld01 == 0] <- ee9$agea[ee9$bthcld01 == 0]
+
+descr::freq(ee9$fcldage2, w = ee9$pspwght)
+
+fit3 <- survfit(Surv(fcldage2, bthcld01) ~ 1, data = ee9, weights = pspwght)
+summary(fit3)
+
+plot(fit3, conf.int = T, mark.time = F, xlim = c(0,51))
+```
+
+jätame välja indiviidid, kelle puhul võiks olla kindel, et nad lapsi enam ei saa
+
+```{r}
+
+hist(ee9$fcldage, breaks = 25, freq = T)
+
+ee9_51 <- ee9[ee9$agea <= 51 | ee9$bthcld01 == 1,]
+
+fit4 <- survfit(Surv(fcldage2, bthcld01) ~ 1, data = ee9_51, weights = pspwght)
+summary(fit4)
+
+plot(fit4, conf.int = T, mark.time = F, xlim = c(0,51))
+```
+
+Karmistame väljajätukriteeriumi, sest kuigi lapsi saadakse küll 41 aataselt, siis neid, kes **esimese** lapse saavad, on suhteliselt vähe.
+
+```{r}
+ee9_41 <- ee9[ee9$agea <= 41 | ee9$bthcld01 == 1,]
+
+fit5 <- survfit(Surv(fcldage2, bthcld01) ~ 1, data = ee9_41, weights = pspwght)
+summary(fit5)
+
+plot(fit5, conf.int = T, mark.time = F, xlim = c(0,51))
+```
+
+
+Kaplan-Meier rühmiti 
+
+```{r}
+#Jagame vastajad kolme rühma sünniaasta järgi faktoriaalseks tunnuseks sisuliselt
+ee9_41$yrbrncat <- cut(ee9_41$yrbrn, c(1928, 1960, 1980, 2003))
+
+fit_yrbrn <- survfit(Surv(fcldage2, bthcld01) ~ yrbrncat, data = ee9_41, weights = pspwght)
+
+summary(fit_yrbrn)
+
+plot(fit_yrbrn, col = c("red", "green", "blue"), conf.int = T, mark.time = F, xlim = c(0,51))
+
+library(survminer)
+#Siit saame järeldada, et noorem põlvkond saab hilisemas vanuses lapsi.
+ggsurvplot(fit_yrbrn, data = ee9_41, conf.int = TRUE, 
+           censor = F, #meid ei huvita tsenseeritud inimesed 
+           legend.labs = c("1928-60", "1961-80", "1981-2003"), 
+           surv.median.line = "hv", #tahame mediaaniväärtusied ka 
+           ggtheme = theme_minimal())
+```
+
+K-M haridustee pikkuse lõikes. SIin näeme, et kõige pikema haridusteega põlvkond saab mõneti hiljem lapsi ehk püsib lastetuna vähem aega.
+```{r}
+ee9_41$eduyrscat <- cut(ee9_41$eduyrs, c(0, 9, 12, 15, 30))
+
+fit_eduyrs <- survfit(Surv(fcldage2, bthcld01) ~ eduyrscat, data = ee9_41, weights = pspwght)
+
+plot(fit_eduyrs, col = c("black", "red", "blue", "green"))
+
+ggsurvplot(fit_eduyrs, data = ee9_41, conf.int = TRUE, 
+           censor = F, 
+           legend.labs = c("0-9", "10-12", "13-15", "16+"), 
+           surv.median.line = "hv", 
+           ggtheme = theme_minimal())
+```
+
+logaritmiline astaktest (log-rank test) 
+```{r}
+#survdiff on logaritmilise astaktesti funktsioon. Näeme, et rühmade vahel on oluline erinevus hii-ruut testi kohaselt. Siin tekib erinevus, sest kolmas kõver (vt üleval sinine), mis erineb oluliselt ja seega tleb oluline hii-ruut.
+survdiff(Surv(fcldage2, bthcld01) ~ yrbrncat, data = ee9_41)
+
+#Näeme,et erinevus on kõige suurem pikima haridusteega grupis ja on ka oluline statistiliselt.
+survdiff(Surv(fcldage2, bthcld01) ~ eduyrscat, data = ee9_41)
+
+#Võrdleme ainult kahte gruppi. Ei saa öelda, et nende kahe grupi elukestuskõverad on erinevad.
+survdiff(Surv(fcldage2, bthcld01) ~ eduyrscat, data = subset(ee9_41, eduyrs <= 12))
+
+#Teist kahte gruppi siin.
+survdiff(Surv(fcldage2, bthcld01) ~ eduyrscat, data = subset(ee9_41, eduyrs > 12))
+```
+
+Coxi regressioon. Coxi regressioon arvab, et suhe ei muutu aja jooksul. Küismus on, et kui enamus aja ei muutu, aga lõpus muutub ka siis on ikka ok. Saame ühe numbri (koefitsendi), mis näitab riskisuhet.
+```{r}
+ee9_41$gndr01 <- ee9_41$gndr
+ee9_41$gndr01[ee9_41$gndr == 2] <- 1
+ee9_41$gndr01[ee9_41$gndr == 1] <- 0
+ee9_41$gndr01 <- as.factor(ee9_41$gndr01)
+
+coxmod1 <- coxph(Surv(fcldage2, bthcld01) ~ gndr, data = ee9_41, weights = pspwght)
+summary(coxmod1)
+```
+
+lisame mudelisse haridustee pikkuse ja sünniaasta
+```{r}
+coxmod2 <- coxph(Surv(fcldage2, bthcld01) ~ gndr01 + eduyrs + yrbrn, data = ee9_41, weights = pspwght)
+summary(coxmod2)
+```
+
+vaatame mudeli alusel prognoositavat elukestuskõverat
+```{r}
+ggsurvplot(survfit(coxmod2), data = ee9_41, 
+           censor = F, 
+           surv.median.line = "hv", 
+           ggtheme = theme_minimal())
+```
+
+Kuidas erinevad mudeli alusel prognoositavad meeste ja naiste elukestuskõverad?
+
+```{r}
+gndr01_df <- with(ee9_41,
+               data.frame(gndr01 = as.factor(c(0, 1)),
+                          eduyrs = rep(weighted.mean(eduyrs, w = pspwght, na.rm = TRUE), 2),
+                          yrbrn = rep(weighted.mean(yrbrn, w = pspwght, na.rm = TRUE), 2)
+               )
+)
+gndr01_df
+
+fit <- survfit(coxmod2, newdata = gndr01_df)
+ggsurvplot(fit, data = gndr01_df, conf.int = TRUE, 
+           censor = F, 
+           legend.labs=c("Mehed", "Naised"), 
+           surv.median.line = "hv", 
+           ggtheme = theme_minimal())
+```
+
+leidke iseseisvalt, kuidas erinevad mudeli alusel prognoositavad elukestuskõverad eri pikkusega haridusteega ja eri aastatel sündinud inimestel. Haridustee puhul võiks võrrelda nt 8, 12 ja 17 aasta pikkuse haridusteega inimeste prognoose ning sünniaasta puhul 1950., 1970. ja 1990. aastal sündinute omasid.
+
+Riskide võrdelisuse eeldus 
+
+kontrollime tagantjärele ka riskide võrdelisuse eeldust Schönfeldi jääkide alusel
+jäägid ei tohiks ajas varieeruda, sest Coxi mudel eeldab, et sõltumatute tunnuste väärtused ajas ei varieeru
+
+
+```{r}
+test_ph <- cox.zph(coxmod2)
+test_ph
+```
+
+
+mida väiksemad jäägid, sega täpsem on mudeli alusel saadav prognoos. Riskide võrdelisuse osas on tähtis, et jäägid peaksid varieeruma sõltumatu tunnuse regressioonikordaja ümber, varieeruvus ei tohiks ajas muutuda. Visuaalne vaatlus võib päris hästi seda võimaldada. Y-teljel on jääkie väärtused ja jäägid ei tohiks ajas varieeruda. Siin on tähtis, et jäägid peaksid varieeruma sõltumatu tunnuse regressioonikordaja ümber 1.7 oli ta meil "soo" puhul. Jääkida hajuvus peaks enamvähem ühtlane olema. Siin joonisel võiks küll öelda, et ei sõltu ajast. Diagonaalis ei tohi must joon olla ja punaste täpikeste hajuvus ei tohi erinev olla.
+
+```{r}
+ggcoxzph(test_ph, var = "gndr01")
+ggcoxzph(test_ph, var = "eduyrs")
+ggcoxzph(test_ph, var = "yrbrn")
+```
+
+
