@@ -32,7 +32,7 @@ ee9 <- import_country(country = "Estonia", rounds = 9, format= "spss")
 
 ```{r}
 survival <- ee9 %>% 
-  select(fcldbrn, blgetmg, occf14b, bthcld, occm14b, agea, pspwght, yrbrn)
+  select(fcldbrn, blgetmg, occf14b, bthcld, occm14b, agea, pspwght, yrbrn, gndr, eduyrs)
 ```
 
 
@@ -42,6 +42,8 @@ survival$bthcld01 <- as.numeric(survival$bthcld)
 survival$bthcld01[survival$bthcld01 == 2] <- 0
 
 survival$fcldage <- survival$fcldbrn - survival$yrbrn
+
+ee9$occf14b
 ```
 
 Simplest model
@@ -81,6 +83,7 @@ summary(fit3)
 plot(fit3, conf.int = T, mark.time = F, xlim = c(0,51))
 ```
 
+teeme immigrandistaatuse (blgetmg) numbriliseks ja 2 kodeeritud 0ks. Ning vanemate haridustaseme osas võtame selle haridustaseme, mis on hierarhias kõrgemal. Olgu siis ema või isa. Seejärel vähendame kategooriaid 9-lt 3-le.
 ```{r}
 surv_51$blgetmg2 <- as.numeric(surv_51$blgetmg)
 surv_51$blgetmg2[surv_51$blgetmg2 == 2] <- 0
@@ -92,7 +95,6 @@ surv_51 <- surv_51 %>%
     TRUE ~ as.numeric(surv_51$occm14b)
   ))
 
-surv_51$occf14b
 
 #1-3: Upper and middle class workers; 4-6: Skilled working-class; 7-9: Low-skilled working class.
 surv_51 <- surv_51 %>%
@@ -102,6 +104,8 @@ surv_51 <- surv_51 %>%
 fit_minor <- survfit(Surv(fcldage2, bthcld01) ~ blgetmg2, data = surv_51, weights = pspwght)
 fit_occ <- survfit(Surv(fcldage2, bthcld01) ~ occ_best_num2, data = surv_51, weights = pspwght)
 fit_min_occ <- survfit(Surv(fcldage2, bthcld01) ~ blgetmg2 + occ_best_num2, data = surv_51, weights = pspwght)
+
+fit_occ2 <- survfit(Surv(fcldage2, bthcld01) ~ occ_best_fac, data = surv_51, weights = pspwght)
 
 summary(fit_minor)
 summary(fit_occ)
@@ -113,19 +117,92 @@ ggsurvplot(fit_minor, data = surv_51, conf.int = TRUE,
            surv.median.line = "hv", #tahame mediaaniväärtusied ka 
            ggtheme = theme_minimal())
 
-ggsurvplot(fit_occ, data = surv_51, conf.int = TRUE, 
+ggsave("kodutoo5_pildid/kaplan_minority.png", height = 10, width = 10, unit = "cm", dpi = 300)
+
+#Siin on oluline kuidas grupeerisin
+ggsurvplot(fit_occ2, data = surv_51, conf.int = TRUE, 
            censor = F, #meid ei huvita tsenseeritud inimesed 
-           legend.labs = c("Upper and middle class workers", "Skilled working class", "Low-skilled working class"), 
+           legend.labs = c("Low-skilled working class", "Skilled working class", "Upper and middle class workers"), 
            surv.median.line = "hv", #tahame mediaaniväärtusied ka 
            ggtheme = theme_minimal())
 
-ggsurvplot(fit_min_occ, data = surv_51, conf.int = TRUE, 
-           censor = F, #meid ei huvita tsenseeritud inimesed 
-           legend.labs = c(1:6), 
-           surv.median.line = "hv", #tahame mediaaniväärtusied ka 
-           ggtheme = theme_minimal())
+ggsave("kodutoo5_pildid/kaplan_occupation.png", height = 10, width = 10, unit = "cm", dpi = 300)
 ```
 
 
+```{r}
+surv_51$gndr01 <- surv_51$gndr
+surv_51$gndr01[surv_51$gndr == 2] <- 1
+surv_51$gndr01[surv_51$gndr == 1] <- 0
+surv_51$gndr01 <- as.factor(surv_51$gndr01)
 
+surv_51 = surv_51 %>% 
+  mutate(occ_best_fac = recode(occ_best_num, `1` = "Up_n_mid", `2` = "Up_n_mid", `3`="Up_n_mid", `4`="Skilled", `5`="Skilled",`6`="Skilled", `7`="low_skilled", `8`="low_skilled", `9`="low_skilled"))
+
+surv_51$occ_best_fac <- factor(surv_51$occ_best_fac, levels = c("low_skilled", "Skilled", "Up_n_mid"))
+surv_51$blgetmg2 <- as.factor(surv_51$blgetmg2)
+
+#Mudel kõigi tunnustega
+coxmod1 <- coxph(Surv(fcldage2, bthcld01) ~ gndr01 + eduyrs + yrbrn + blgetmg2 + occ_best_fac, data = surv_51, weights = pspwght)
+summary(coxmod1)
+
+
+#Üldise mudeli visualitsatsioon
+ggsurvplot(survfit(coxmod1), data = surv_51, 
+           censor = F, 
+           surv.median.line = "hv", 
+           ggtheme = theme_minimal())
+
+ggsave("kodutoo5_pildid/cox_general.png", height = 10, width = 10, unit = "cm", dpi = 300)
+
+#Kõik teised asjad on konstantsed ja vaatame blgetmg2 effekti sellise df-iga visuaalselt
+blget_df <- data.frame(blgetmg2 = as.factor(c(0, 1)),
+                          eduyrs = rep(weighted.mean(surv_51$eduyrs, w = surv_51$pspwght, na.rm = TRUE), 2),
+                          yrbrn = rep(weighted.mean(surv_51$yrbrn, w = surv_51$pspwght, na.rm = TRUE), 2),
+                          gndr01= as.factor(rep(0,2)),
+                          occ_best_fac = as.factor(rep("low_skilled", 2)))
+                          
+blget_df
+
+fit <- survfit(coxmod1, newdata = blget_df)
+ggsurvplot(fit, data = gndr01_df, conf.int = TRUE, 
+           censor = F, 
+           legend.labs=c("Non-Immigrant", "Immigrant"), 
+           surv.median.line = "hv", 
+           ggtheme = theme_minimal())
+
+ggsave("kodutoo5_pildid/cox_minority.png", height = 10, width = 10, unit = "cm", dpi = 300)
+
+#Kõik teised asjad on konstantsed ja vaatame töökoha effekti sellise df-iga visuaalselt
+occ_df <- data.frame(occ_best_fac = factor(c("low_skilled", "Skilled", "Up_n_mid")),
+                          eduyrs = rep(weighted.mean(surv_51$eduyrs, w = surv_51$pspwght, na.rm = TRUE), 3),
+                          yrbrn = rep(weighted.mean(surv_51$yrbrn, w = surv_51$pspwght, na.rm = TRUE), 3),
+                          gndr01= factor(rep(0,3)),
+                          blgetmg2 = factor(rep(0,3)))
+                          
+occ_df
+
+fit2 <- survfit(coxmod1, newdata = occ_df)
+ggsurvplot(fit2, data = occ_df, conf.int = TRUE, 
+           censor = F, 
+           legend.labs=c("Low_skilled working class", "Skilled working class", "Upper and middle class workers"), 
+           surv.median.line = "hv", 
+           ggtheme = theme_minimal())
+
+ggsave("kodutoo5_pildid/cox_occupation.png", height = 10, width = 10, unit = "cm", dpi = 300)
+```
+
+
+```{r}
+test_ph <- cox.zph(coxmod1)
+test_ph
+```
+
+```{r}
+ggcoxzph(test_ph, var = "gndr01")
+ggcoxzph(test_ph, var = "eduyrs")
+ggcoxzph(test_ph, var = "yrbrn")
+ggcoxzph(test_ph, var = "blgetmg2")
+ggcoxzph(test_ph, var = "occ_best_fac")
+```
 
